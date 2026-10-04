@@ -2,6 +2,11 @@
 
 A minimal web terminal. Open a page, get a real shell. No login, no accounts, no database.
 
+> **⚠️ This is remote code execution by design.** There is no authentication unless you
+> enable `WEBTERM_TOKEN`. Anyone who can reach the port gets a shell as the user running
+> the process — and therefore that user's files, keys and credentials. Default to
+> `--host 127.0.0.1` and read [Security](#security--read-this) before exposing it.
+
 ```
 webterm/
 ├── server.py              # FastAPI + PTY-backed shell over WebSocket (~170 lines)
