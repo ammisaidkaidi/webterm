@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>terminal</title>
+<link rel="stylesheet" href="/static/vendor/xterm.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>▮</text></svg>" />
+<style>
+  :root{
+    --bg:#0e0e11;
+    --panel:#141418;
+    --line:#232329;
+    --fg:#e6e6e9;
+    --dim:#71717a;
+    --ok:#4ade80;
+    --off:#f87171;
+    --hit:#26262e;
+    --sel:#33333d;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#fbfbfc; --panel:#fff; --line:#e6e6ea; --fg:#18181b; --dim:#8a8a93; --hit:#ececf1; --sel:#cfe0ff; }
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; overscroll-behavior:none; }
+  body{
+    background:var(--bg); color:var(--fg);
+    font:13px/1.4 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    display:flex; flex-direction:column;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    display:flex; align-items:center; gap:10px;
+    padding:0 14px; height:38px; flex:0 0 38px;
+    border-bottom:1px solid var(--line); background:var(--panel);
+    user-select:none;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--off); flex:0 0 auto; transition:background .2s; }
+  .dot.on{ background:var(--ok); }
+  .title{ color:var(--dim); letter-spacing:.04em; }
+  .title.flash{ color:var(--ok); }
+  .spacer{ flex:1; }
+  header button{
+    font:inherit; color:var(--dim); background:transparent;
+    border:1px solid var(--line); border-radius:6px;
+    padding:3px 9px; cursor:pointer;
+  }
+  header button:hover{ color:var(--fg); border-color:var(--dim); }
+  header button:active{ transform:translateY(1px); }
+
+  main{ flex:1; min-height:0; padding:8px 10px; position:relative; }
+  #term{ height:100%; }
+  .xterm-viewport::-webkit-scrollbar{ width:8px; }
+  .xterm-viewport::-webkit-scrollbar-thumb{ background:var(--line); border-radius:8px; }
+  .xterm-viewport{ scrollbar-width:thin; }
+  /* let the browser's own selection UI work inside xterm's DOM layers */
+  .xterm .xterm-screen, .xterm .xterm-rows{ user-select:text; -webkit-user-select:text; }
+
+  /* select mode: plain selectable text over the terminal */
+  #sel{
+    display:none; position:absolute; inset:8px 10px;
+    margin:0; padding:0 2px; overflow:auto;
+    background:var(--bg); color:var(--fg);
+    font:13px/1.25 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-word;
+    user-select:text; -webkit-user-select:text; -webkit-touch-callout:default;
+    cursor:text;
+  }
+  body.selmode #sel{ display:block; }
+  body.selmode #term{ visibility:hidden; }
+  #sel::selection, #sel *::selection{ background:var(--sel); }
+  .hint{
+    position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+    background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:4px 12px; color:var(--dim); font-size:12px; pointer-events:none;
+    display:none; white-space:nowrap;
+  }
+  body.selmode .hint{ display:block; }
+
+  /* bottom key bar */
+  nav{
+    flex:0 0 auto;
+    display:flex; gap:6px; align-items:center;
+    padding:7px 10px calc(7px + env(safe-area-inset-bottom));
+    background:var(--panel); border-top:1px solid var(--line);
+    overflow-x:auto; overflow-y:hidden;
+    scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    user-select:none; -webkit-user-select:none;
+  }
+  nav::-webkit-scrollbar{ display:none; }
+  .k{
+    flex:0 0 auto;
+    min-width:34px; height:30px; padding:0 9px;
+    display:inline-flex; align-items:center; justify-content:center;
+    font:inherit; color:var(--fg); background:transparent;
+    border:1px solid var(--line); border-radius:7px;
+    cursor:pointer; touch-action:manipulation;
+    transition:background .12s,border-color .12s,color .12s;
+  }
+  .k:hover{ border-color:var(--dim); }
+  .k.hit{ background:var(--hit); }
+  .k.on{ color:var(--bg); background:var(--fg); border-color:var(--fg); }
+  .k.wide{ font-size:12px; letter-spacing:.03em; }
+  .sep{ flex:0 0 auto; width:1px; height:18px; background:var(--line); margin:0 2px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="dot" id="dot"></span>
+    <span class="title" id="status">connecting</span>
+    <span class="spacer"></span>
+    <button id="clear" title="Clear screen">clear</button>
+    <button id="reconnect" title="Restart the shell">restart</button>
+  </header>
+
+  <main>
+    <div id="term"></div>
+    <pre id="sel" tabindex="0"></pre>
+    <div class="hint">select the text, then tap <b>copy</b> — or <b>sel</b> to go back</div>
+  </main>
+
+  <nav id="keys" aria-label="terminal keys"></nav>
+
+  <script src="/static/vendor/xterm.js"></script>
+  <script src="/static/vendor/addon-fit.js"></script>
+  <script src="/static/vendor/addon-weblinks.js"></script>
+  <script>
+  (function () {
+    const dark = !window.matchMedia("(prefers-color-scheme: light)").matches;
+    const theme = dark
+      ? { background:"#0e0e11", foreground:"#e6e6e9", cursor:"#e6e6e9",
+          selectionBackground:"#33333d", selectionForeground:"#ffffff",
+          black:"#0e0e11", brightBlack:"#52525b" }
+      : { background:"#fbfbfc", foreground:"#18181b", cursor:"#18181b",
+          selectionBackground:"#cfe0ff", selectionForeground:"#18181b" };
+
+    const term = new Terminal({
+      theme,
+      fontFamily: 'ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace',
+      fontSize: 13,
+      lineHeight: 1.25,
+      cursorBlink: true,
+      scrollback: 10000,
+      allowProposedApi: true,
+      macOptionIsMeta: true,
+      rightClickSelectsWord: true,
+      altClickMovesCursor: false,
+    });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    try { term.loadAddon(new WebLinksAddon.WebLinksAddon()); } catch (e) {}
+    term.open(document.getElementById("term"));
+    fit.fit();
+    term.focus();
+
+    const dot = document.getElementById("dot");
+    const status = document.getElementById("status");
+    const selPane = document.getElementById("sel");
+    const token = new URLSearchParams(location.search).get("token") || "";
+    let ws = null, closedByUser = false, retry = 0, baseStatus = "connecting";
+
+    function setState(on, text) { baseStatus = text; dot.classList.toggle("on", on); status.textContent = text; }
+    let flashT;
+    function flash(msg) {                       // transient note in the status slot
+      status.textContent = msg; status.classList.add("flash");
+      clearTimeout(flashT);
+      flashT = setTimeout(() => { status.textContent = baseStatus; status.classList.remove("flash"); }, 1200);
+    }
+    const send = (o) => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o)); };
+    const sendSize = () => send({ t: "r", rows: term.rows, cols: term.cols });
+
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const q = new URLSearchParams({ rows: term.rows, cols: term.cols });
+      if (token) q.set("token", token);
+      ws = new WebSocket(`${proto}://${location.host}/ws?${q}`);
+      ws.onopen = () => { retry = 0; setState(true, "connected"); sendSize(); term.focus(); };
+      ws.onmessage = (ev) => {
+        const m = JSON.parse(ev.data);
+        if (m.t === "o") term.write(m.d);
+        else if (m.t === "exit") { setState(false, "shell exited"); term.writeln("\r\n\x1b[90m[process exited]\x1b[0m"); }
+      };
+      ws.onclose = (ev) => {
+        setState(false, ev.code === 4401 ? "unauthorized" : "disconnected");
+        if (closedByUser || ev.code === 4401) return;
+        retry = Math.min(retry + 1, 6);
+        setTimeout(connect, 400 * retry);
+      };
+    }
+
+    /* ---------- clipboard (works on http too, via execCommand fallback) ---------- */
+    async function toClipboard(text) {
+      if (!text) { flash("nothing selected"); return false; }
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          flash("copied " + text.length + " chars"); return true;
+        }
+      } catch (e) {}
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+        document.body.appendChild(ta);
+        ta.select(); ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand("copy");
+        ta.remove();
+        flash(ok ? "copied " + text.length + " chars" : "copy blocked");
+        return ok;
+      } catch (e) { flash("copy blocked"); return false; }
+    }
+
+    async function fromClipboard() {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          const t = await navigator.clipboard.readText();
+          if (t) { term.paste(t); flash("pasted"); return; }
+        }
+      } catch (e) {}
+      flash("press Ctrl+V / ⌘V");      // browser-native paste still reaches xterm
+      term.focus();
+    }
+
+    // what to copy: xterm selection → select-pane selection → nothing
+    function currentSelection() {
+      const docSel = String(window.getSelection() || "");
+      if (document.body.classList.contains("selmode")) return docSel;
+      return term.getSelection() || docSel;
+    }
+    const copySelection = () => toClipboard(currentSelection());
+
+    // desktop convention: releasing a drag-selection copies it
+    document.getElementById("term").addEventListener("mouseup", (e) => {
+      const s = term.getSelection();
+      if (s) { if (e.button === 0) toClipboard(s); return; }     // don't steal the selection
+      if (!String(window.getSelection() || "")) term.focus();
+    });
+    // middle-click paste, X11 style
+    document.getElementById("term").addEventListener("auxclick", (e) => {
+      if (e.button === 1) { e.preventDefault(); fromClipboard(); }
+    });
+
+    /* ---------- select mode: real, selectable text (works with touch) ---------- */
+    function bufferText() {
+      const b = term.buffer.active;
+      const out = [];
+      for (let i = 0; i < b.length; i++) {
+        const line = b.getLine(i);
+        if (!line) continue;
+        let s = line.translateToString(true);
+        // join xterm's wrapped continuation rows back into one logical line
+        if (line.isWrapped && out.length) out[out.length - 1] += s;
+        else out.push(s);
+      }
+      while (out.length && !out[out.length - 1].trim()) out.pop();
+      return out.join("\n");
+    }
+
+    function setSelMode(on) {
+      document.body.classList.toggle("selmode", on);
+      document.querySelectorAll('.k[data-act="sel"]').forEach(b => b.classList.toggle("on", on));
+      if (on) {
+        selPane.textContent = bufferText();
+        selPane.scrollTop = selPane.scrollHeight;
+        const sel = term.getSelection();
+        if (!sel) { window.getSelection().removeAllRanges(); }
+        flash("select mode");
+      } else {
+        window.getSelection().removeAllRanges();
+        term.focus();
+        setState(dot.classList.contains("on"), baseStatus);
+      }
+    }
+    const toggleSel = () => setSelMode(!document.body.classList.contains("selmode"));
+
+    /* ---------- sticky modifiers ---------- */
+    const mod = { ctrl: false, alt: false };
+    function setMod(name, on) {
+      mod[name] = on;
+      document.querySelectorAll(`.k[data-mod="${name}"]`).forEach(b => b.classList.toggle("on", on));
+    }
+    const clearMods = () => { setMod("ctrl", false); setMod("alt", false); };
+
+    function emit(data) {
+      if (!data) return;
+      if (mod.ctrl && data.length === 1) {
+        const c = data.toUpperCase().charCodeAt(0);
+        if (c >= 63 && c <= 95) data = String.fromCharCode(c - 64);
+        else if (c === 32) data = "\x00";
+      }
+      if (mod.alt) data = "\x1b" + data;
+      clearMods();
+      send({ t: "i", d: data });
+    }
+    term.onData(emit);
+
+    /* ---------- keyboard shortcuts ---------- */
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown") return true;
+      const k = e.key.toLowerCase();
+      if (e.ctrlKey && e.shiftKey && k === "c") { copySelection(); return false; }
+      if (e.ctrlKey && e.shiftKey && k === "v") { fromClipboard(); return false; }
+      if (e.ctrlKey && e.shiftKey && k === "a") { setSelMode(true); selectAllPane(); return false; }
+      if (e.ctrlKey && e.key === "Insert") { copySelection(); return false; }
+      if (e.shiftKey && e.key === "Insert") { fromClipboard(); return false; }
+      // Ctrl-C with an active selection copies; with none it still interrupts
+      if (e.ctrlKey && !e.shiftKey && k === "c" && term.getSelection()) {
+        copySelection(); term.clearSelection(); return false;
+      }
+      return true;
+    });
+
+    function selectAllPane() {
+      const r = document.createRange();
+      r.selectNodeContents(selPane);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    }
+
+    /* ---------- bottom key bar ---------- */
+    const KEYS = [
+      { l: "esc",  d: "\x1b",   t: "Escape" },
+      { l: "tab",  d: "\t",     t: "Tab — complete", wide: true },
+      { l: "ctrl", mod: "ctrl", t: "Ctrl (sticky — tap, then a key)", wide: true },
+      { l: "alt",  mod: "alt",  t: "Alt / Meta (sticky)", wide: true },
+      { sep: true },
+      { l: "sel",  act: "sel",  t: "Select mode — selectable text for touch copy", wide: true },
+      { l: "copy", act: "copy", t: "Copy selection (Ctrl+Shift+C)", wide: true },
+      { l: "paste",act: "paste",t: "Paste (Ctrl+Shift+V)", wide: true },
+      { l: "all",  act: "all",  t: "Select everything on screen", wide: true },
+      { sep: true },
+      { l: "↑", d: "\x1b[A", t: "Previous command", rep: true },
+      { l: "↓", d: "\x1b[B", t: "Next command",     rep: true },
+      { l: "←", d: "\x1b[D", t: "Left",  rep: true },
+      { l: "→", d: "\x1b[C", t: "Right", rep: true },
+      { sep: true },
+      { l: "^C", d: "\x03", t: "Interrupt" },
+      { l: "^D", d: "\x04", t: "EOF / exit" },
+      { l: "^Z", d: "\x1a", t: "Suspend" },
+      { l: "^R", d: "\x12", t: "Reverse history search" },
+      { sep: true },
+      { l: "⇱", d: "\x01", t: "Start of line (Ctrl-A)" },
+      { l: "⇲", d: "\x05", t: "End of line (Ctrl-E)" },
+      { l: "⌫", d: "\x7f", t: "Backspace", rep: true },
+      { sep: true },
+      { l: "|", d: "|" },
+      { l: "~", d: "~" },
+      { l: "/", d: "/" },
+      { l: "-", d: "-" },
+      { l: "↵", d: "\r", t: "Enter" },
+    ];
+
+    const ACTIONS = {
+      sel: toggleSel,
+      copy: () => copySelection(),
+      paste: fromClipboard,
+      all: () => {
+        if (!document.body.classList.contains("selmode")) setSelMode(true);
+        selectAllPane();
+        flash("selected all");
+      },
+    };
+
+    const nav = document.getElementById("keys");
+    for (const k of KEYS) {
+      if (k.sep) { const s = document.createElement("span"); s.className = "sep"; nav.appendChild(s); continue; }
+      const b = document.createElement("button");
+      b.className = "k" + (k.wide ? " wide" : "");
+      b.textContent = k.l;
+      b.title = k.t || k.l;
+      b.type = "button";
+      if (k.mod) b.dataset.mod = k.mod;
+      if (k.act) b.dataset.act = k.act;
+
+      // never steal focus or clear the user's selection
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+
+      let holdT, repT;
+      const press = () => {
+        b.classList.add("hit");
+        setTimeout(() => b.classList.remove("hit"), 110);
+        if (k.act) { ACTIONS[k.act](); return; }
+        if (k.mod) { setMod(k.mod, !mod[k.mod]); return; }
+        if (document.body.classList.contains("selmode")) setSelMode(false);
+        emit(k.d);
+        term.focus();
+      };
+      const stop = () => { clearTimeout(holdT); clearInterval(repT); };
+
+      b.addEventListener("pointerdown", () => {
+        press();
+        if (!k.rep) return;
+        holdT = setTimeout(() => { repT = setInterval(() => { send({ t: "i", d: k.d }); }, 70); }, 420);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, stop));
+      nav.appendChild(b);
+    }
+
+    /* ---------- resize / header buttons ---------- */
+    let rt;
+    const resize = () => { clearTimeout(rt); rt = setTimeout(() => { fit.fit(); sendSize(); }, 60); };
+    window.addEventListener("resize", resize);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
+    new ResizeObserver(resize).observe(document.getElementById("term"));
+
+    document.getElementById("clear").onclick = () => { setSelMode(false); term.clear(); term.focus(); };
+    document.getElementById("reconnect").onclick = () => {
+      closedByUser = true; setSelMode(false);
+      if (ws) ws.close();
+      term.reset(); clearMods();
+      setState(false, "restarting");
+      setTimeout(() => { closedByUser = false; connect(); }, 150);
+    };
+
+    connect();
+  })();
+  </script>
+</body>
+</html>
