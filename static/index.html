@@ -77,6 +77,75 @@
   }
   body.selmode .hint{ display:block; }
 
+  /* floating button */
+  .fab{
+    position:fixed; right:16px; bottom:calc(58px + env(safe-area-inset-bottom));
+    width:46px; height:46px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--panel); color:var(--fg);
+    border:1px solid var(--line); cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,.28);
+    z-index:40; transition:transform .15s, border-color .15s;
+  }
+  .fab:hover{ border-color:var(--dim); }
+  .fab:active{ transform:scale(.94); }
+  .fab svg{ width:20px; height:20px; }
+
+  /* file browser */
+  .scrim{
+    position:fixed; inset:0; background:rgba(0,0,0,.45);
+    opacity:0; pointer-events:none; transition:opacity .18s; z-index:45;
+  }
+  body.files .scrim{ opacity:1; pointer-events:auto; }
+  .drawer{
+    position:fixed; top:0 ; right:0; height:100%; width:min(380px,88vw);
+    background:var(--panel); border-left:1px solid var(--line);
+    transform:translateX(100%); transition:transform .2s ease;
+    z-index:50; display:flex; flex-direction:column;
+  }
+  body.files .drawer{ transform:none; }
+  .drawer .top{
+    display:flex; align-items:center; gap:8px;
+    padding:9px 10px; border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .drawer .top b{ font-weight:600; letter-spacing:.03em; }
+  .mini{
+    font:inherit; font-size:12px; color:var(--dim); background:transparent;
+    border:1px solid var(--line); border-radius:6px; padding:2px 7px; cursor:pointer;
+  }
+  .mini:hover{ color:var(--fg); border-color:var(--dim); }
+  .mini.on{ color:var(--bg); background:var(--fg); border-color:var(--fg); }
+  .crumbs{
+    display:flex; flex-wrap:wrap; gap:2px; align-items:center;
+    padding:7px 10px; border-bottom:1px solid var(--line);
+    font-size:12px; color:var(--dim); flex:0 0 auto; max-height:70px; overflow:auto;
+  }
+  .crumbs button{
+    font:inherit; color:var(--dim); background:transparent; border:0;
+    padding:1px 3px; border-radius:4px; cursor:pointer;
+  }
+  .crumbs button:hover{ color:var(--fg); background:var(--hit); }
+  .crumbs span{ opacity:.5; }
+  .list{ flex:1; overflow:auto; padding:4px 0; }
+  .row{
+    display:flex; align-items:center; gap:9px;
+    padding:6px 10px; cursor:pointer; user-select:none;
+  }
+  .row:hover{ background:var(--hit); }
+  .row .ic{ flex:0 0 14px; color:var(--dim); display:flex; }
+  .row .ic svg{ width:14px; height:14px; }
+  .row .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row.d .nm{ font-weight:500; }
+  .row.x .nm{ color:var(--ok); }
+  .row .sz{ flex:0 0 auto; font-size:11px; color:var(--dim); }
+  .row .go{
+    flex:0 0 auto; font-size:11px; color:var(--dim); opacity:0;
+    border:1px solid var(--line); border-radius:5px; padding:1px 5px;
+  }
+  .row:hover .go{ opacity:1; }
+  .row .go:hover{ color:var(--fg); }
+  .empty{ padding:14px 12px; color:var(--dim); font-size:12px; }
+
   /* bottom key bar */
   nav{
     flex:0 0 auto;
@@ -121,6 +190,26 @@
 
   <nav id="keys" aria-label="terminal keys"></nav>
 
+  <button class="fab" id="fab" title="Files (Ctrl+Shift+F)" aria-label="open file browser">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    </svg>
+  </button>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="file browser">
+    <div class="top">
+      <b>files</b>
+      <span class="spacer" style="flex:1"></span>
+      <button class="mini" id="f-sync" title="Jump to the shell's current directory">sync</button>
+      <button class="mini" id="f-hidden" title="Show dotfiles">.*</button>
+      <button class="mini" id="f-reload" title="Reload">↻</button>
+      <button class="mini" id="f-close" title="Close">✕</button>
+    </div>
+    <div class="crumbs" id="f-crumbs"></div>
+    <div class="list" id="f-list"></div>
+  </aside>
+
   <script src="/static/vendor/xterm.js"></script>
   <script src="/static/vendor/addon-fit.js"></script>
   <script src="/static/vendor/addon-weblinks.js"></script>
@@ -157,7 +246,7 @@
     const status = document.getElementById("status");
     const selPane = document.getElementById("sel");
     const token = new URLSearchParams(location.search).get("token") || "";
-    let ws = null, closedByUser = false, retry = 0, baseStatus = "connecting";
+    let ws = null, closedByUser = false, retry = 0, baseStatus = "connecting", sid = "";
 
     function setState(on, text) { baseStatus = text; dot.classList.toggle("on", on); status.textContent = text; }
     let flashT;
@@ -178,6 +267,7 @@
       ws.onmessage = (ev) => {
         const m = JSON.parse(ev.data);
         if (m.t === "o") term.write(m.d);
+        else if (m.t === "sid") sid = m.d;          // lets /api/ls follow this shell's cwd
         else if (m.t === "exit") { setState(false, "shell exited"); term.writeln("\r\n\x1b[90m[process exited]\x1b[0m"); }
       };
       ws.onclose = (ev) => {
@@ -298,9 +388,12 @@
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       const k = e.key.toLowerCase();
+      // xterm stopPropagation()s keys it handles, so Esc must be caught here too
+      if (e.key === "Escape" && drawer.open) { closeFiles(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "c") { copySelection(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "v") { fromClipboard(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "a") { setSelMode(true); selectAllPane(); return false; }
+      if (e.ctrlKey && e.shiftKey && k === "f") { toggleFiles(); return false; }
       if (e.ctrlKey && e.key === "Insert") { copySelection(); return false; }
       if (e.shiftKey && e.key === "Insert") { fromClipboard(); return false; }
       // Ctrl-C with an active selection copies; with none it still interrupts
@@ -395,6 +488,130 @@
       ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, stop));
       nav.appendChild(b);
     }
+
+    /* ---------- file browser ---------- */
+    const drawer = { path: null, hidden: false, open: false };
+    const fList = document.getElementById("f-list");
+    const fCrumbs = document.getElementById("f-crumbs");
+
+    const ICON = {
+      dir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+      file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+      link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+    };
+
+    const human = (n) => {
+      if (n < 1024) return n + " B";
+      const u = ["K", "M", "G", "T"]; let i = -1;
+      do { n /= 1024; i++; } while (n >= 1024 && i < 3);
+      return (n < 10 ? n.toFixed(1) : Math.round(n)) + u[i];
+    };
+    // POSIX-safe single quoting, so spaces and quotes in names can't break the command
+    const q = (s) => "'" + s.replace(/'/g, "'\\''") + "'";
+    const join = (dir, name) => (dir.endsWith("/") ? dir + name : dir + "/" + name);
+
+    async function loadDir(path) {
+      const p = new URLSearchParams({ path: path || "", hidden: drawer.hidden ? 1 : 0 });
+      if (sid) p.set("sid", sid);
+      if (token) p.set("token", token);
+      fList.innerHTML = '<div class="empty">loading…</div>';
+      let d;
+      try {
+        const r = await fetch("/api/ls?" + p);
+        if (!r.ok) { fList.innerHTML = `<div class="empty">${r.status === 403 ? "permission denied" : "cannot open"}</div>`; return; }
+        d = await r.json();
+      } catch (e) { fList.innerHTML = '<div class="empty">request failed</div>'; return; }
+
+      drawer.path = d.path;
+      renderCrumbs(d);
+      renderList(d);
+    }
+
+    function renderCrumbs(d) {
+      fCrumbs.innerHTML = "";
+      const mk = (label, path) => {
+        const b = document.createElement("button");
+        b.textContent = label; b.onclick = () => loadDir(path);
+        fCrumbs.appendChild(b);
+      };
+      mk("/", "/");
+      let acc = "";
+      d.path.split("/").filter(Boolean).forEach((part, i) => {
+        acc += "/" + part;
+        if (i) { const s = document.createElement("span"); s.textContent = "/"; fCrumbs.appendChild(s); }
+        mk(part, acc);
+      });
+    }
+
+    function renderList(d) {
+      fList.innerHTML = "";
+      if (d.parent !== null) {
+        const up = document.createElement("div");
+        up.className = "row d";
+        up.innerHTML = `<span class="ic">${ICON.dir}</span><span class="nm">..</span>`;
+        up.onclick = () => loadDir(d.parent);
+        fList.appendChild(up);
+      }
+      if (!d.entries.length) {
+        const e = document.createElement("div");
+        e.className = "empty"; e.textContent = "empty directory";
+        fList.appendChild(e);
+      }
+      for (const it of d.entries) {
+        const full = join(d.path, it.name);
+        const row = document.createElement("div");
+        row.className = "row" + (it.dir ? " d" : "") + (it.exe ? " x" : "");
+        row.innerHTML =
+          `<span class="ic">${it.link ? ICON.link : it.dir ? ICON.dir : ICON.file}</span>` +
+          `<span class="nm"></span>` +
+          (it.dir ? "" : `<span class="sz">${human(it.size)}</span>`) +
+          `<span class="go">${it.dir ? "cd" : "⤓"}</span>`;
+        row.querySelector(".nm").textContent = it.name;      // textContent: no HTML injection from filenames
+        row.title = full;
+
+        row.onclick = () => {
+          if (it.dir) loadDir(full);
+          // file → type its path at the prompt, then hand focus back so you can keep typing
+          else { send({ t: "i", d: q(full) }); term.focus(); flash("path inserted"); }
+        };
+        row.querySelector(".go").onclick = (ev) => {
+          ev.stopPropagation();
+          // \x15 (kill-line) first: the prompt may already hold a path you inserted
+          if (it.dir) { send({ t: "i", d: "\x15cd " + q(full) + "\n" }); closeFiles(); flash("cd " + it.name); }
+          else {
+            const p = new URLSearchParams({ path: full });
+            if (token) p.set("token", token);
+            const a = document.createElement("a");
+            a.href = "/api/download?" + p; a.download = it.name;
+            document.body.appendChild(a); a.click(); a.remove();
+          }
+        };
+        fList.appendChild(row);
+      }
+      if (d.truncated) {
+        const t = document.createElement("div");
+        t.className = "empty"; t.textContent = "… listing truncated at 2000 entries";
+        fList.appendChild(t);
+      }
+    }
+
+    function openFiles()  { drawer.open = true;  document.body.classList.add("files"); loadDir(drawer.path || ""); }
+    function closeFiles() { drawer.open = false; document.body.classList.remove("files"); term.focus(); }
+    const toggleFiles = () => (drawer.open ? closeFiles() : openFiles());
+
+    document.getElementById("fab").onclick = toggleFiles;
+    document.getElementById("scrim").onclick = closeFiles;
+    document.getElementById("f-close").onclick = closeFiles;
+    document.getElementById("f-reload").onclick = () => loadDir(drawer.path || "");
+    document.getElementById("f-sync").onclick = () => loadDir("");          // "" = follow the shell
+    document.getElementById("f-hidden").onclick = (e) => {
+      drawer.hidden = !drawer.hidden;
+      e.currentTarget.classList.toggle("on", drawer.hidden);
+      loadDir(drawer.path || "");
+    };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawer.open) { closeFiles(); e.preventDefault(); }
+    });
 
     /* ---------- resize / header buttons ---------- */
     let rt;

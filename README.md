@@ -55,6 +55,34 @@ prevented), so the on-screen keyboard stays open on mobile.
 Hold-to-repeat kicks in after 420 ms at ~14 keys/s. Adding a key is one line in the `KEYS`
 array in `static/index.html`: `{ l: "label", d: "bytes to send", t: "tooltip", rep: true }`.
 
+## File browser
+
+A floating button (bottom-right, or `Ctrl+Shift+F`) slides out a file browser. It opens on
+**the shell's own current directory** — the server resolves `/proc/<shell pid>/cwd`, so it
+follows your `cd`s instead of tracking some separate notion of "where you are".
+
+| action | result |
+|---|---|
+| click a folder | browse into it |
+| click a folder's `cd` chip | runs `cd <path>` in the shell and closes the drawer |
+| click a file | types its quoted path at the prompt, focus returns to the terminal |
+| click a file's `⤓` chip | downloads it |
+| breadcrumb segment | jump to any ancestor directory |
+| `sync` | jump back to wherever the shell is now |
+| `.*` | toggle dotfiles |
+| `Esc` / scrim / `✕` | close |
+
+Folders sort first, executables are tinted, symlinks get their own icon, and sizes are
+human-readable. Paths are quoted POSIX-style (`'it'\''s a file.txt'`), so spaces and
+apostrophes in filenames can't break the command — and `cd` is prefixed with `\x15`
+(kill-line) so it can't concatenate onto a path you already inserted. Filenames render via
+`textContent`, never `innerHTML`.
+
+Endpoints: `GET /api/ls?path=&sid=&hidden=` (empty `path` means "follow the shell") and
+`GET /api/download?path=`. Both honour `WEBTERM_TOKEN`. They are deliberately **not**
+sandboxed to a root directory — this app already hands out a shell, so a path jail would be
+security theatre.
+
 ## Selecting and copying
 
 A terminal canvas isn't normally selectable, so there are two paths:

@@ -21,9 +21,11 @@ import pty
 import signal
 import struct
 import termios
+import time
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -63,6 +65,7 @@ class Session:
     """One forked shell attached to a pseudo-terminal."""
 
     def __init__(self, rows: int = 24, cols: int = 80):
+        self.sid = uuid.uuid4().hex[:12]
         self.pid, self.fd = pty.fork()
         if self.pid == 0:  # child
             shell = pick_shell()
@@ -81,6 +84,13 @@ class Session:
 
     def write(self, data: str) -> None:
         os.write(self.fd, data.encode("utf-8", "ignore"))
+
+    def cwd(self) -> str:
+        """Where the shell currently is, so the file browser can follow it."""
+        try:
+            return os.readlink(f"/proc/{self.pid}/cwd")       # Linux
+        except OSError:
+            return os.path.expanduser("~")
 
     def resize(self, rows: int, cols: int) -> None:
         set_winsize(self.fd, rows, cols)
@@ -101,6 +111,77 @@ class Session:
             pass
 
 
+SESSIONS: dict = {}          # sid -> Session, so /api/ls can follow the shell's cwd
+
+
+def check_token(token: str) -> None:
+    if TOKEN and token != TOKEN:
+        raise HTTPException(status_code=401, detail="bad token")
+
+
+def resolve(path: str, sid: str) -> str:
+    """Absolute path for a request; empty path means 'wherever the shell is'."""
+    if not path:
+        s = SESSIONS.get(sid)
+        return s.cwd() if s else os.path.expanduser("~")
+    return os.path.realpath(os.path.expanduser(path))
+
+
+@app.get("/api/ls")
+async def api_ls(path: str = "", sid: str = "", token: str = "", hidden: int = 0):
+    """List a directory. No sandbox: this is a shell, the files are already reachable."""
+    check_token(token)
+    target = resolve(path, sid)
+    if not os.path.isdir(target):
+        raise HTTPException(status_code=404, detail="not a directory")
+
+    entries, truncated = [], False
+    try:
+        with os.scandir(target) as it:
+            for e in it:
+                if not hidden and e.name.startswith("."):
+                    continue
+                if len(entries) >= 2000:
+                    truncated = True
+                    break
+                try:
+                    is_dir = e.is_dir()
+                    st = e.stat(follow_symlinks=False)
+                    size, mtime = st.st_size, st.st_mtime
+                    mode = st.st_mode
+                except OSError:
+                    is_dir, size, mtime, mode = False, 0, 0, 0
+                entries.append({
+                    "name": e.name,
+                    "dir": is_dir,
+                    "link": e.is_symlink(),
+                    "exe": bool(mode & 0o111) and not is_dir,
+                    "size": size,
+                    "mtime": mtime,
+                })
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="permission denied")
+
+    entries.sort(key=lambda x: (not x["dir"], x["name"].lower()))
+    return {
+        "path": target,
+        "parent": None if target == "/" else os.path.dirname(target) or "/",
+        "home": os.path.expanduser("~"),
+        "entries": entries,
+        "truncated": truncated,
+        "now": time.time(),
+    }
+
+
+@app.get("/api/download")
+async def api_download(path: str, token: str = ""):
+    check_token(token)
+    p = os.path.realpath(os.path.expanduser(path))
+    if not os.path.isfile(p):
+        raise HTTPException(status_code=404, detail="not a file")
+    return FileResponse(p, filename=os.path.basename(p), media_type="application/octet-stream")
+
+
 @app.websocket("/ws")
 async def ws_terminal(ws: WebSocket):
     if TOKEN and ws.query_params.get("token") != TOKEN:
@@ -115,6 +196,8 @@ async def ws_terminal(ws: WebSocket):
         rows, cols = 24, 80
 
     session = Session(rows, cols)
+    SESSIONS[session.sid] = session
+    await ws.send_text(json.dumps({"t": "sid", "d": session.sid}))
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -154,6 +237,7 @@ async def ws_terminal(ws: WebSocket):
         pass
     finally:
         pumper.cancel()
+        SESSIONS.pop(session.sid, None)
         try:
             loop.remove_reader(session.fd)
         except Exception:
