@@ -57,31 +57,50 @@ array in `static/index.html`: `{ l: "label", d: "bytes to send", t: "tooltip", r
 
 ## File browser
 
-A floating button (bottom-right, or `Ctrl+Shift+F`) slides out a file browser. It opens on
-**the shell's own current directory** — the server resolves `/proc/<shell pid>/cwd`, so it
-follows your `cd`s instead of tracking some separate notion of "where you are".
+A floating button (bottom-right, or `Ctrl+Shift+F`) slides out a Windows-Explorer-style
+browser: address breadcrumbs, back / forward / up, a details list with sortable **Name ·
+Date modified · Type · Size** columns, folders first, a status bar, and a right-click
+context menu. It opens on **the shell's own current directory** — the server resolves
+`/proc/<shell pid>/cwd`, so it follows your `cd`s.
 
 | action | result |
 |---|---|
-| click a folder | browse into it |
-| click a folder's `cd` chip | runs `cd <path>` in the shell and closes the drawer |
-| click a file | types its quoted path at the prompt, focus returns to the terminal |
-| click a file's `⤓` chip | downloads it |
-| breadcrumb segment | jump to any ancestor directory |
-| `sync` | jump back to wherever the shell is now |
-| `.*` | toggle dotfiles |
-| `Esc` / scrim / `✕` | close |
+| single click | select (status bar shows name and size) |
+| double click | folder: open · file: type its quoted path at the prompt |
+| right-click / long-press | context menu |
+| `download` | file: streams directly · **folder: zipped on the fly and downloaded** |
+| `properties` (or `Alt+Enter`) | properties dialog — see below |
+| `new folder` | `mkdir` in the current directory |
+| `sync` / `hidden` | follow the shell · show dotfiles (shown dimmed, like Explorer) |
+| column headers | sort by name, date, type or size; click again to reverse |
+| `←` `→` `↑` | back, forward, up — with `Alt+←` / `Alt+→` / `Backspace` |
+| `↑` `↓` `Enter` `F2` `Delete` `F5` | select, open, rename, delete, refresh |
+| `Esc` | closes dialog, then menu, then drawer |
 
-Folders sort first, executables are tinted, symlinks get their own icon, and sizes are
-human-readable. Paths are quoted POSIX-style (`'it'\''s a file.txt'`), so spaces and
-apostrophes in filenames can't break the command — and `cd` is prefixed with `\x15`
-(kill-line) so it can't concatenate onto a path you already inserted. Filenames render via
-`textContent`, never `innerHTML`.
+Context menu: Open / Insert path, `cd here`, **View with less**, Download, Rename, Hide /
+Unhide, Delete, Properties.
 
-Endpoints: `GET /api/ls?path=&sid=&hidden=` (empty `path` means "follow the shell") and
-`GET /api/download?path=`. Both honour `WEBTERM_TOKEN`. They are deliberately **not**
-sandboxed to a root directory — this app already hands out a shell, so a path jail would be
-security theatre.
+### Properties
+
+Shows name, type, location, size, modified / accessed / changed times, owner : group, and
+the mode string. Editable:
+
+- **Permissions** — the full Unix 3×3 grid (Owner / Group / Others × Read / Write /
+  Execute) wired two-way to an octal field: tick a box and `644` becomes `744`, type an
+  octal and the boxes follow. Applied with `chmod`.
+- **Hidden** — ticking it renames the entry to a leading dot (and unticking strips it),
+  which is what "hidden" actually means on Unix.
+- **Read-only** — clears every write bit, the Windows attribute mapped onto `chmod`.
+- **Rename** — the name field.
+- **Folder size** — `calculate…` walks the tree for a true recursive size and file count,
+  kept out of the normal listing so browsing stays fast.
+
+Endpoints, all honouring `WEBTERM_TOKEN`: `GET /api/ls`, `GET /api/stat` (`deep=1` for
+recursive size), `GET /api/download` (zips directories), `POST /api/chmod`, `/api/rename`,
+`/api/mkdir`, `/api/delete`. Paths are quoted POSIX-style (`'it'\''s a file.txt'`) before
+they reach the shell, filenames render via `textContent`, and `delete` refuses `/` and
+`$HOME`. Nothing is jailed to a root directory — this app already hands out a shell, so a
+path jail would be security theatre.
 
 ## Selecting and copying
 
