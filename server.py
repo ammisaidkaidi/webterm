@@ -13,6 +13,8 @@ WEBTERM_TOKEN=secret and open  http://host:port/?token=secret
 """
 
 import argparse
+import threading
+import collections
 import asyncio
 import fcntl
 import grp
@@ -804,6 +806,155 @@ async def ws_raw(ws: WebSocket, host: str = "", port: int = 23,
             await writer.wait_closed()
         except OSError:
             pass
+
+
+# ---------------------------------------------------------------------------
+# packet capture
+# ---------------------------------------------------------------------------
+
+CAP = {                       # the one capture this server runs at a time
+    "proc": None,             # the sudo'd sniffer.py process
+    "thread": None,
+    "packets": collections.deque(maxlen=4000),
+    "seq": 0,                 # every packet gets one, so the UI can poll for new ones
+    "started": 0.0,
+    "port": 0,
+    "addr": "",
+    "error": "",
+    "dropped": 0,
+    "bytes": 0,
+}
+CAP_LOCK = threading.Lock()          # guards the buffer, held only for moments
+CAP_BUSY = asyncio.Lock()            # serialises start/stop, which race otherwise
+
+
+def cap_reader(proc):
+    """Drain the sniffer's stdout into the ring buffer, one JSON line per packet."""
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            pkt = json.loads(line)
+        except ValueError:
+            with CAP_LOCK:
+                CAP["error"] = line[:200]      # anything non-JSON is an error message
+            continue
+        with CAP_LOCK:
+            if "dropped" in pkt:
+                CAP["dropped"] += pkt["dropped"]
+                continue
+            CAP["seq"] += 1
+            pkt["seq"] = CAP["seq"]
+            CAP["bytes"] += pkt.get("len", 0)
+            CAP["packets"].append(pkt)
+    rest = (proc.stderr.read() or "").strip() if proc.stderr else ""
+    if rest:
+        with CAP_LOCK:
+            CAP["error"] = rest[:200]
+
+
+def cap_running() -> bool:
+    proc = CAP["proc"]
+    return bool(proc and proc.poll() is None)
+
+
+def cap_listeners(port: int) -> list:
+    """Every socket listening on this port, so the view can say whether anything is there.
+
+    Goes through sudo the way /api/net does, otherwise the owning process of
+    another user's socket comes back blank.
+    """
+    conns = None
+    if os.geteuid() != 0 and sudo_available():
+        conns = (sudo_helper("net", "") or {}).get("conns")
+    if conns is None:
+        try:
+            conns = do_net().get("conns", [])
+        except OSError:
+            return []
+    return [c for c in conns if c.get("listen") and (not port or c.get("lport") == port)]
+
+
+def cap_kill():
+    """Stop the running capture, if there is one. Caller holds CAP_BUSY."""
+    proc = CAP["proc"]
+    if proc and proc.poll() is None:
+        if os.geteuid() != 0 and sudo_available():
+            run_sudo(["kill", str(proc.pid)])   # started under sudo, so it is root-owned
+        else:
+            proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
+    CAP["proc"] = None
+
+
+@app.post("/api/cap/start")
+async def api_cap_start(body: dict = Body(...)):
+    """Start capturing. One capture at a time: starting again replaces it."""
+    check_token(body.get("token", ""))
+    port = int(body.get("port") or 0)
+    if port and not 1 <= port <= 65535:
+        raise HTTPException(status_code=400, detail="a port is 1-65535")
+    addr = str(body.get("addr") or "")
+    snap = max(0, min(int(body.get("snap") or 512), 4096))
+
+    cmd = [sys.executable, os.path.join(BASE, "sniffer.py"),
+           "--port", str(port), "--addr", addr, "--snap", str(snap)]
+    if os.geteuid() != 0:
+        if not sudo_available():
+            raise HTTPException(status_code=403,
+                                detail="packet capture needs root, and sudo is unavailable")
+        cmd = ["sudo", "-n"] + cmd
+
+    # Start and stop have to be serialised. A stop that arrives while a start
+    # is still spawning finds no process to kill, and the capture it was meant
+    # to end outlives the page that asked for it.
+    async with CAP_BUSY:
+        cap_kill()
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, bufsize=1)
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from None
+
+        with CAP_LOCK:
+            CAP.update(proc=proc, packets=collections.deque(maxlen=4000), seq=0,
+                       started=time.time(), port=port, addr=addr, error="", dropped=0,
+                       bytes=0)
+        thread = threading.Thread(target=cap_reader, args=(proc,), daemon=True)
+        thread.start()
+        CAP["thread"] = thread
+        await asyncio.sleep(0.3)              # long enough for an instant failure to show up
+        if proc.poll() is not None:
+            raise HTTPException(status_code=500,
+                                detail=CAP["error"] or "capture exited immediately")
+    return {"running": True, "port": port, "addr": addr}
+
+
+@app.post("/api/cap/stop")
+async def api_cap_stop(body: dict = Body(...)):
+    check_token(body.get("token", ""))
+    async with CAP_BUSY:
+        cap_kill()
+    return {"running": False}
+
+
+@app.get("/api/cap")
+async def api_cap(since: int = 0, limit: int = 400, token: str = ""):
+    """Packets newer than `since`, plus what the capture and the port are doing."""
+    check_token(token)
+    with CAP_LOCK:
+        packets = [p for p in CAP["packets"] if p["seq"] > since][-limit:]
+        state = {"running": cap_running(), "port": CAP["port"], "addr": CAP["addr"],
+                 "seq": CAP["seq"], "dropped": CAP["dropped"], "bytes": CAP["bytes"],
+                 "started": CAP["started"], "error": CAP["error"]}
+    state["packets"] = packets
+    state["listeners"] = cap_listeners(CAP["port"])
+    state["now"] = time.time()
+    return state
 
 
 @app.get("/api/users")

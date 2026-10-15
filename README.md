@@ -313,6 +313,62 @@ required. `dnspython`, `cryptography` and `zeroconf` are listed in `requirements
 without them the DNS tool drops to A/AAAA, the certificate panel shows only its size, and
 mDNS is skipped while SSDP still runs.
 
+## Packet capture
+
+![packet capture](screenshot-packets.png)
+
+The third floating button, above the process one (**Ctrl+Shift+K**), opens a
+**packets** tab: every packet crossing this machine, live, with its payload.
+
+```
+port [ 25 ]   address [ 127.0.0.1 (loopback) ]   [stop] [auto] [clear]
+port 25 — listening on 0.0.0.0:25 (python3)
+11:47:30.843 ▼ tcp 127.0.0.1:43936 → 127.0.0.1:25   S    60B
+11:47:30.843 ▲ tcp 127.0.0.1:25 → 127.0.0.1:43936   PA   84B
+```
+
+- **port** filters to one port, and empty means every port. A port is 1-65535;
+  anything else is refused before the request is sent.
+- **address** is every address, `0.0.0.0` (which means every interface, so it
+  reads the same as no filter), or `127.0.0.1` for loopback only.
+- **start** begins the capture, **auto** follows new packets as they arrive
+  (polled once a second), **clear** empties the list without stopping.
+- The line under the controls says what is **listening on that port**, refreshed
+  on every poll whether or not a capture is running — so an empty list tells you
+  whether nothing arrived or nothing was ever there.
+- The drawer's filter box narrows the list by address, port, protocol or flags.
+- Clicking a packet dumps its payload as hex and ASCII underneath.
+
+Direction is relative to the port you are watching: **▼** is toward it, **▲**
+away from it. With no port filter, the kernel's own direction is used instead.
+
+The button turns red while a capture is running, including when the drawer is
+closed, because a capture keeps running until you stop it.
+
+### How it captures
+
+There is no `tcpdump` on every machine, so `sniffer.py` is the capture: an
+`AF_PACKET` socket in `SOCK_DGRAM` mode, which hands back packets with the
+link-layer header already stripped, so loopback and ethernet parse the same
+way. It prints one JSON line per packet and the server keeps the last 4000 in
+memory. It runs on its own too:
+
+```sh
+sudo python3 sniffer.py --port 25 --addr 127.0.0.1
+```
+
+Two details worth knowing:
+
+- Raw sockets are **root-only**, so the server starts it through `sudo -n`. With
+  `WEBTERM_SUDO=0`, or no passwordless sudo, the capture reports that instead of
+  failing quietly.
+- Loopback hands the same packet over twice, once outgoing and once incoming,
+  so a local conversation would read as doubled. Exact repeats within 50 ms are
+  dropped.
+
+Capture is capped at 400 packets a second and 512 payload bytes per packet; the
+status line reports anything dropped to the rate limit.
+
 ## Selecting and copying
 
 A terminal canvas isn't normally selectable, so there are two paths:
@@ -419,6 +475,12 @@ greeter that advertises STARTTLS and completes the handshake with a
 self-signed certificate it generates on first run.
 
 ## Security — read this
+
+**Packet capture reads other people's traffic.** The packets tab runs a raw
+socket as root and shows every packet on the machine, payload included — other
+users' sessions, and any credential sent over a plaintext protocol. It is one
+click away for anyone who can reach this page.
+
 
 This is remote code execution by design. Anyone who can reach the port gets a shell as the
 user running `server.py`, which also means access to that user's keys and files.

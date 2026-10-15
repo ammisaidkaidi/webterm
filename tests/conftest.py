@@ -155,6 +155,27 @@ def services():
         pytest.skip(f"no fixture services on {missing}: run `sudo python3 dev/fixtures.py`")
 
 
+@pytest.fixture
+def no_capture(server):
+    """No capture running, before or after.
+
+    The capture is one process per server, not per page, so a leaked one from
+    an earlier run would show up as "already capturing" here.
+    """
+    import urllib.request
+    def stop():
+        req = urllib.request.Request(server.rstrip("/") + "/api/cap/stop",
+                                     data=b"{}", method="POST",
+                                     headers={"content-type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=5).read()
+        except OSError:
+            pass
+    stop()
+    yield
+    stop()
+
+
 @pytest.fixture(scope="session")
 def user1():
     """A second login account, for the user switcher."""

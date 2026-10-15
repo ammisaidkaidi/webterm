@@ -129,6 +129,37 @@
   .fab:active{ transform:scale(.94); }
   .fab svg{ width:20px; height:20px; }
   .fab.top{ bottom:calc(114px + env(safe-area-inset-bottom)); }
+  .fab.top2{ bottom:calc(170px + env(safe-area-inset-bottom)); }
+  .fab.rec{ border-color:var(--off); color:var(--off); }   /* capture running */
+
+  .cappane{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  .cappane[hidden]{ display:none; }
+  .capbar{ display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+           padding:7px 10px; border-bottom:1px solid var(--p-line); }
+  .capbar input, .capbar select{
+    background:var(--p-bg2); color:var(--p-fg); border:1px solid var(--p-line);
+    border-radius:5px; padding:3px 6px; font:inherit; font-size:12px; }
+  .capbar input{ width:92px; }
+  .capbar label{ color:var(--p-dim); font-size:11.5px; }
+  .caplisten{ padding:5px 10px; font-size:11.5px; color:var(--p-dim);
+              border-bottom:1px solid var(--p-line); white-space:nowrap;
+              overflow:hidden; text-overflow:ellipsis; }
+  .caplisten b{ color:var(--p-fg); font-weight:600; }
+  .caplisten.none b{ color:var(--p-dim); }
+  .caplist{ flex:1; overflow:auto; font-size:12px; }
+  .crow{ display:grid; grid-template-columns:76px 26px 52px 1fr 54px 52px;
+         gap:6px; padding:2px 10px; cursor:pointer; white-space:nowrap; }
+  .crow:hover{ background:var(--p-bg2); }
+  .crow.on{ background:var(--p-sel); }
+  .crow .cdir{ text-align:center; }
+  .crow.in  .cdir{ color:var(--p-accent); }
+  .crow.out .cdir{ color:var(--p-dim); }
+  .crow .cnum{ text-align:right; color:var(--p-dim); }
+  .crow .cflags{ color:var(--p-dim); }
+  .crow .cpeer{ overflow:hidden; text-overflow:ellipsis; }
+  .cdump{ border-top:1px solid var(--p-line); max-height:40%; overflow:auto;
+          padding:7px 10px; font-size:11.5px; white-space:pre; color:var(--p-fg); }
+  .caphint{ padding:14px 10px; color:var(--p-dim); }
 
   /* process viewer — palette lifted from the Ace themes (one_dark / textmate) */
   .psdrawer{
@@ -495,12 +526,19 @@
     </svg>
   </button>
 
+  <button class="fab top2" id="fab-cap" title="Packets (Ctrl+Shift+K)" aria-label="open packet capture">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 12h3l2.5-7 4 14 3-9 2 2h5.5"/>
+    </svg>
+  </button>
+
   <aside class="psdrawer" id="psdrawer" aria-label="process viewer">
     <div class="ptop">
       <span class="tabs">
         <button class="tab on" id="tab-ps" data-tab="ps">processes</button>
         <button class="tab" id="tab-net" data-tab="net">connections</button>
         <button class="tab" id="tab-disc" data-tab="disc">network</button>
+        <button class="tab" id="tab-cap" data-tab="cap">packets</button>
       </span>
       <input class="filter" id="ps-filter" placeholder="filter by name, user or pid" spellcheck="false">
       <button class="pmini" id="ps-auto" title="Auto-refresh every 2s">auto</button>
@@ -541,6 +579,24 @@
           <button type="submit">send</button>
         </form>
       </div>
+    </div>
+    <div class="cappane" id="cappane" hidden>
+      <div class="capbar">
+        <label for="cap-port">port</label>
+        <input id="cap-port" placeholder="all" inputmode="numeric" spellcheck="false">
+        <label for="cap-addr">address</label>
+        <select id="cap-addr">
+          <option value="">all addresses</option>
+          <option value="0.0.0.0">0.0.0.0 (every interface)</option>
+          <option value="127.0.0.1">127.0.0.1 (loopback)</option>
+        </select>
+        <button class="pmini" id="cap-run" title="Start capturing">start</button>
+        <button class="pmini" id="cap-auto" title="Follow new packets">auto</button>
+        <button class="pmini" id="cap-clear" title="Clear the list">clear</button>
+      </div>
+      <div class="caplisten" id="cap-listen"></div>
+      <div class="caplist" id="cap-list"><div class="caphint">press start to capture</div></div>
+      <div class="cdump" id="cap-dump" hidden></div>
     </div>
     <div class="pfoot">
       <span id="ps-status"></span><span style="flex:1"></span>
@@ -797,6 +853,7 @@
       if (e.ctrlKey && e.shiftKey && k === "a") { setSelMode(true); selectAllPane(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "f") { toggleFiles(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "p") { togglePs(); return false; }
+      if (e.ctrlKey && e.shiftKey && k === "k") { toggleCap(); return false; }
       if (e.ctrlKey && e.key === "Insert") { copySelection(); return false; }
       if (e.shiftKey && e.key === "Insert") { fromClipboard(); return false; }
       // Ctrl-C with an active selection copies; with none it still interrupts
@@ -2310,18 +2367,22 @@
     function setTab(tab) {
       PS.tab = tab; PS.sel = null;
       const disc = tab === "disc";
+      const cap = tab === "cap";
+      capAuto(false);                       // polling restarts below if we land on packets
       document.body.classList.toggle("nettab", tab === "net");
       document.querySelectorAll(".psdrawer .tab").forEach(t =>
         t.classList.toggle("on", t.dataset.tab === tab));
       document.getElementById("ps-head").style.display = (tab === "ps") ? "" : "none";
       document.getElementById("net-head").style.display = (tab === "net") ? "" : "none";
       document.getElementById("ps-filter").style.display = disc ? "none" : "";
-      document.getElementById("ps-auto").style.display = disc ? "none" : "";
-      document.getElementById("ps-reload").style.display = disc ? "none" : "";
-      psList.style.display = disc ? "none" : "";
+      document.getElementById("ps-auto").style.display = (disc || cap) ? "none" : "";
+      document.getElementById("ps-reload").style.display = (disc || cap) ? "none" : "";
+      psList.style.display = (disc || cap) ? "none" : "";
       dPane.hidden = !disc;
-      document.getElementById("ps-filter").placeholder = tab === "net"
-        ? "filter by port, address, state, service or pid"
+      document.getElementById("cappane").hidden = !cap;
+      document.getElementById("ps-filter").placeholder =
+        tab === "net" ? "filter by port, address, state, service or pid"
+        : cap ? "filter by address, port, protocol or flags"
         : "filter by name, user or pid";
       psList.innerHTML = "";
       if (disc) {
@@ -2329,6 +2390,10 @@
         psStatus.textContent = "network discovery";
         document.querySelectorAll("[data-needproc]").forEach(b => { b.disabled = true; });
         if (!dTools.children.length) { buildTools(); pickTool("self"); }
+      } else if (cap) {
+        setAuto(false); stopBw();
+        document.querySelectorAll("[data-needproc]").forEach(b => { b.disabled = true; });
+        capTick(); capAuto(true);
       } else {
         stopBw();
         refresh();
@@ -2409,7 +2474,7 @@
       refresh(); setAuto(true);
     }
     function closePs() {
-      stopBw(); closeSvc();
+      stopBw(); closeSvc(); capAuto(false);
       PS.open = false; document.body.classList.remove("procs");
       setAuto(false); term.focus();
     }
@@ -2421,6 +2486,161 @@
       if (on) PS.timer = setInterval(refresh, 2000);
     }
 
+    // ---- packet capture -------------------------------------------------
+    const CAP = { rows: [], seq: 0, sel: null, auto: true, timer: 0,
+                  running: false, port: 0 };
+    const capList   = document.getElementById("cap-list");
+    const capDump   = document.getElementById("cap-dump");
+    const capListen = document.getElementById("cap-listen");
+    const capRun    = document.getElementById("cap-run");
+
+    const hhmmss = (ts) => {
+      const d = new Date(ts * 1000);
+      return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0");
+    };
+
+    function hexdump(hex) {
+      // Two columns, the way every packet tool shows a payload: bytes, then
+      // the printable version of those same bytes.
+      const bytes = [];
+      for (let i = 0; i < hex.length; i += 2) bytes.push(parseInt(hex.substr(i, 2), 16));
+      let out = "";
+      for (let i = 0; i < bytes.length; i += 16) {
+        const row = bytes.slice(i, i + 16);
+        const hexes = row.map(b => b.toString(16).padStart(2, "0")).join(" ").padEnd(47, " ");
+        const text = row.map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : ".").join("");
+        out += String(i).padStart(5, "0") + "  " + hexes + "  " + text + "\n";
+      }
+      return out || "(no payload)";
+    }
+
+    function capMatches(p) {
+      const f = PS.filter.trim().toLowerCase();
+      if (!f) return true;
+      return [p.proto, p.src, p.dst, p.sport, p.dport, p.flags, p.iface]
+        .join(" ").toLowerCase().includes(f);
+    }
+
+    function renderCap() {
+      const rows = CAP.rows.filter(capMatches);
+      if (!rows.length) {
+        capList.innerHTML = '<div class="caphint">' +
+          (CAP.running ? "capturing — nothing matched yet" : "press start to capture") + "</div>";
+        return;
+      }
+      const atBottom = capList.scrollHeight - capList.scrollTop - capList.clientHeight < 40;
+      capList.innerHTML = rows.slice(-800).map(p => {
+        return `<div class="crow ${p.dir} ${CAP.sel === p.seq ? "on" : ""}" data-seq="${p.seq}">` +
+          `<span class="cnum">${hhmmss(p.ts)}</span>` +
+          `<span class="cdir">${p.dir === "in" ? "▼" : "▲"}</span>` +
+          `<span>${esc(p.proto)}</span>` +
+          `<span class="cpeer">${esc(p.src)}:${p.sport ?? "-"} → ${esc(p.dst)}:${p.dport ?? "-"}</span>` +
+          `<span class="cflags">${esc(p.flags || "")}</span>` +
+          `<span class="cnum">${p.len}B</span></div>`;
+      }).join("");
+      capList.querySelectorAll(".crow").forEach(r => {
+        r.onclick = () => { CAP.sel = Number(r.dataset.seq); renderCap(); showDump(); };
+      });
+      if (CAP.auto && atBottom) capList.scrollTop = capList.scrollHeight;
+    }
+
+    function showDump() {
+      const p = CAP.rows.find(r => r.seq === CAP.sel);
+      capDump.hidden = !p;
+      if (!p) return;
+      capDump.textContent =
+        `${p.proto} ${p.src}:${p.sport ?? "-"} → ${p.dst}:${p.dport ?? "-"}  ` +
+        `${p.flags || ""}  ${p.len} bytes on ${p.iface}\n\n` + hexdump(p.payload || "");
+    }
+
+    function renderListen(d) {
+      // Who is listening, refreshed on every poll whether or not we are
+      // capturing: a port with nothing behind it explains an empty capture.
+      const port = d.port || Number(document.getElementById("cap-port").value) || 0;
+      const ls = d.listeners || [];
+      if (!ls.length) {
+        capListen.className = "caplisten none";
+        capListen.innerHTML = port
+          ? `port <b>${port}</b> — nothing is listening`
+          : "<b>no port filter</b> — capturing every port";
+        return;
+      }
+      capListen.className = "caplisten";
+      capListen.innerHTML = (port ? `port <b>${port}</b> — listening on ` : "listening: ") +
+        ls.slice(0, 6).map(c =>
+          `<b>${esc(c.local)}:${c.lport}</b>${c.pname ? " (" + esc(c.pname) + ")" : ""}`
+        ).join(", ") + (ls.length > 6 ? ` +${ls.length - 6} more` : "");
+    }
+
+    async function capTick() {
+      if (!PS.open || PS.tab !== "cap") return;   // a poll in flight outlives the tab otherwise
+      let d;
+      try { d = await (await fetch(api("/api/cap", { since: CAP.seq, limit: 400 }))).json(); }
+      catch (e) { psStatus.textContent = "capture request failed"; return; }
+      CAP.running = d.running; CAP.port = d.port;
+      if (d.packets.length) {
+        CAP.rows.push(...d.packets);
+        CAP.seq = d.packets[d.packets.length - 1].seq;
+        if (CAP.rows.length > 4000) CAP.rows.splice(0, CAP.rows.length - 4000);
+      }
+      capRun.textContent = d.running ? "stop" : "start";
+      capRun.classList.toggle("danger", d.running);
+      document.getElementById("fab-cap").classList.toggle("rec", d.running);
+      renderListen(d);
+      renderCap();
+      const secs = d.running ? Math.max(1, Math.round(d.now - d.started)) : 0;
+      psStatus.textContent = d.error ? d.error
+        : (d.running
+            ? `capturing · ${d.seq} packets · ${human(d.bytes)} · ${secs}s` +
+              (d.dropped ? ` · ${d.dropped} dropped (rate limit)` : "")
+            : (d.seq ? `stopped · ${d.seq} packets captured` : "not capturing"));
+    }
+
+    function capAuto(on) {
+      CAP.auto = on;
+      document.getElementById("cap-auto").classList.toggle("on", on);
+      clearInterval(CAP.timer);
+      if (on && PS.tab === "cap") CAP.timer = setInterval(capTick, 1000);
+    }
+
+    async function capToggle() {
+      if (capRun.disabled) return;        // one request at a time, or the two race
+      const portRaw = document.getElementById("cap-port").value.trim();
+      const port = portRaw ? Number(portRaw) : 0;
+      if (portRaw && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+        flash("a port is 1-65535"); return;
+      }
+      capRun.disabled = true;
+      await capTick();          // decide from the server's state, not a cached flag
+      try {
+        if (CAP.running) {
+          await post("/api/cap/stop", {});
+        } else {
+          CAP.rows = []; CAP.seq = 0; CAP.sel = null; capDump.hidden = true;
+          await post("/api/cap/start", { port, addr: document.getElementById("cap-addr").value });
+          capAuto(true);
+        }
+      } catch (e) { flash(String(e.message)); }
+      capRun.disabled = false;
+      capTick();
+    }
+
+    function toggleCap() {
+      if (PS.open && PS.tab === "cap") { closePs(); return; }
+      if (!PS.open) openPs();
+      setTab("cap");
+    }
+    document.getElementById("fab-cap").onclick = toggleCap;
+    capRun.onclick = capToggle;
+    window.addEventListener("pagehide", () => clearInterval(CAP.timer));
+    document.getElementById("cap-auto").onclick = () => capAuto(!CAP.auto);
+    document.getElementById("cap-clear").onclick = () => {
+      CAP.rows = []; CAP.sel = null; capDump.hidden = true; renderCap();
+    };
+    document.getElementById("cap-port").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); capToggle(); }
+    });
+
     document.getElementById("fab-ps").onclick = togglePs;
     document.getElementById("ps-close").onclick = closePs;
     document.getElementById("ps-reload").onclick = refresh;
@@ -2428,7 +2648,10 @@
     document.getElementById("ps-term").onclick = () => signalProc("TERM");
     document.getElementById("ps-kill").onclick = () => signalProc("KILL");
     document.getElementById("ps-filter").addEventListener("input", (e) => {
-      PS.filter = e.target.value; PS.tab === "net" ? renderNet() : renderPs();
+      PS.filter = e.target.value;
+      if (PS.tab === "net") renderNet();
+      else if (PS.tab === "cap") renderCap();
+      else renderPs();
     });
     document.querySelectorAll(".psdrawer .tab").forEach(t => { t.onclick = () => setTab(t.dataset.tab); });
     document.querySelectorAll("#net-head span").forEach(h => {
