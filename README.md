@@ -323,8 +323,9 @@ The third floating button, above the process one (**Ctrl+Shift+K**), opens a
 ```
 port [ 25 ]   address [ 127.0.0.1 (loopback) ]   [stop] [auto] [clear]
 port 25 — listening on 0.0.0.0:25 (python3)
-11:47:30.843 ▼ tcp 127.0.0.1:43936 → 127.0.0.1:25   S    60B
-11:47:30.843 ▲ tcp 127.0.0.1:25 → 127.0.0.1:43936   PA   84B
+TIME ↑        DIR PROTO SOURCE → DESTINATION            APP             FLAGS  LEN
+12:41:32.678  ▼   tcp   127.0.0.1:57892 → 127.0.0.1:25  nc → python3    S      60B
+12:41:32.679  ▲   tcp   127.0.0.1:25 → 127.0.0.1:57892  python3 → nc    PA     84B
 ```
 
 - **port** filters to one port, and empty means every port. A port is 1-65535;
@@ -338,6 +339,25 @@ port 25 — listening on 0.0.0.0:25 (python3)
   whether nothing arrived or nothing was ever there.
 - The drawer's filter box narrows the list by address, port, protocol or flags.
 - Clicking a packet dumps its payload as hex and ASCII underneath.
+
+**Every column sorts.** Click a header to sort by it, click the same header
+again to reverse, and the active one is marked with ↑ or ↓. Time ascending is
+the default and the only order that keeps auto-follow scrolling, since any
+other order would move rows around under you.
+
+**The app column** names the processes at each end — `nc → python3` for a
+local conversation, a single name when only one end is on this machine, and
+`—` when neither socket belongs to it (traffic merely passing through, or a
+connection that closed before it could be looked up). The tooltip spells it
+out with pids: `nc (52920) sent it, python3 (22097) received it`.
+
+A port is tied to a process through the same socket table the connections tab
+uses, which needs root to see other users' sockets and therefore goes through
+sudo. The table is cached for two seconds, and a miss is retried once against
+a fresh one, because the interesting case — a short-lived client — is exactly
+the one that opens after the last snapshot and is gone moments later. The
+lookup happens as each packet arrives rather than when the browser asks, for
+the same reason.
 
 Direction is relative to the port you are watching: **▼** is toward it, **▲**
 away from it. With no port filter, the kernel's own direction is used instead.

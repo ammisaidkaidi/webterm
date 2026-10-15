@@ -12,6 +12,17 @@ def wait_label(pg, want, timeout=8000):
         arg=want, timeout=timeout)
 
 
+def smtp_chat_nc(port=25):
+    """Traffic from a client that is not this test process.
+
+    The app column is only proved by two different names on the same
+    conversation, and a socket opened here would just say python3 at both
+    ends.
+    """
+    subprocess.run(["nc", "-C", "-w", "2", "127.0.0.1", str(port)],
+                   input=b"EHLO nc-probe\r\nQUIT\r\n", capture_output=True, timeout=10)
+
+
 def smtp_chat(port=25):
     """Make some traffic on a port the capture is watching."""
     with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
@@ -135,3 +146,73 @@ def test_packets(pg, P, services, no_capture):
     time.sleep(1.0)
     P("21 rejects a port above 65535", pg.text_content("#cap-run").strip() == "start",
       pg.text_content("#cap-run"))
+
+
+def test_packet_columns(pg, P, services, no_capture):
+    """The app column, and sorting by clicking a header."""
+    time.sleep(1.0)
+    pg.click("#fab-cap")
+    time.sleep(1.0)
+    pg.fill("#cap-port", "25")
+    pg.click("#cap-run")
+    wait_label(pg, "stop")
+    time.sleep(0.8)
+
+    smtp_chat_nc()
+    smtp_chat_nc()
+    time.sleep(2.5)
+
+    heads = pg.eval_on_selector_all("#cap-head span", "e=>e.map(s=>s.textContent.trim())")
+    P("1 a header per column", len(heads) == 7, heads)
+    P("2 there is an app column", any(h.startswith("APP") for h in heads), heads)
+
+    apps = pg.eval_on_selector_all(".crow .capp", "e=>e.map(s=>s.textContent.trim())")
+    P("3 app column is filled in", sum(a not in ("", "—") for a in apps) >= 4,
+      sorted(set(apps)))
+    joined = " ".join(apps)
+    P("4 names the server process", "python3" in joined, sorted(set(apps)))
+    P("5 names the client process too", "nc" in joined, sorted(set(apps)))
+    P("5b shows both ends of the conversation",
+      any("nc" in a and "python3" in a for a in apps), sorted(set(apps)))
+    P("6 tooltip names both ends",
+      "received it" in (pg.get_attribute(".crow .capp", "title") or ""),
+      pg.get_attribute(".crow .capp", "title"))
+
+    # default order is arrival order
+    first_ts = pg.eval_on_selector_all(".crow .cnum", "e=>e.map(s=>s.textContent)")[0]
+    P("7 time column sorted ascending by default",
+      pg.eval_on_selector("#cap-head span[data-k='ts']", "e=>e.classList.contains('sorted')"),
+      first_ts)
+
+    def lens():
+        return [int(t.replace("B", "")) for t in
+                pg.eval_on_selector_all(".crow span:last-child", "e=>e.map(s=>s.textContent)")]
+
+    pg.click("#cap-head span[data-k='len']")
+    time.sleep(0.5)
+    asc = lens()
+    P("8 sort by length ascending", asc == sorted(asc), asc[:6])
+
+    pg.click("#cap-head span[data-k='len']")
+    time.sleep(0.5)
+    desc = lens()
+    P("9 clicking again reverses", desc == sorted(desc, reverse=True), desc[:6])
+    P("10 the active column is marked",
+      pg.eval_on_selector("#cap-head span[data-k='len']", "e=>e.classList.contains('sorted')")
+      and "↓" in pg.text_content("#cap-head span[data-k='len']"),
+      pg.text_content("#cap-head span[data-k='len']"))
+
+    pg.click("#cap-head span[data-k='app']")
+    time.sleep(0.5)
+    grouped = [a for a in pg.eval_on_selector_all(".crow .capp", "e=>e.map(s=>s.textContent.trim())")]
+    P("11 sort by app groups the processes", grouped == sorted(grouped), grouped[:6])
+    P("12 length column no longer marked",
+      not pg.eval_on_selector("#cap-head span[data-k='len']", "e=>e.classList.contains('sorted')"))
+
+    pg.click("#cap-head span[data-k='ts']")
+    time.sleep(0.4)
+    P("13 back to arrival order",
+      pg.eval_on_selector("#cap-head span[data-k='ts']", "e=>e.classList.contains('sorted')"))
+
+    pg.click("#cap-run")
+    wait_label(pg, "start")

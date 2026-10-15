@@ -147,14 +147,23 @@
   .caplisten b{ color:var(--p-fg); font-weight:600; }
   .caplisten.none b{ color:var(--p-dim); }
   .caplist{ flex:1; overflow:auto; font-size:12px; }
-  .crow{ display:grid; grid-template-columns:76px 26px 52px 1fr 54px 52px;
-         gap:6px; padding:2px 10px; cursor:pointer; white-space:nowrap; }
+  .caphead, .crow{ display:grid;
+    grid-template-columns:82px 26px 44px minmax(170px,1fr) 150px 46px 52px;
+    gap:6px; padding:2px 10px; white-space:nowrap; }
+  .caphead{ color:var(--p-dim); border-bottom:1px solid var(--p-line);
+            padding:4px 10px; font-size:11px; letter-spacing:.03em; user-select:none; }
+  .caphead span{ cursor:pointer; }
+  .caphead span:hover{ color:var(--p-fg); }
+  .caphead span.sorted{ color:var(--p-accent); }
+  .crow{ cursor:pointer; }
   .crow:hover{ background:var(--p-bg2); }
   .crow.on{ background:var(--p-sel); }
   .crow .cdir{ text-align:center; }
   .crow.in  .cdir{ color:var(--p-accent); }
   .crow.out .cdir{ color:var(--p-dim); }
   .crow .cnum{ text-align:right; color:var(--p-dim); }
+  .caphead .cnum{ text-align:right; }
+  .crow .capp{ overflow:hidden; text-overflow:ellipsis; color:var(--p-accent); }
   .crow .cflags{ color:var(--p-dim); }
   .crow .cpeer{ overflow:hidden; text-overflow:ellipsis; }
   .cdump{ border-top:1px solid var(--p-line); max-height:40%; overflow:auto;
@@ -595,6 +604,15 @@
         <button class="pmini" id="cap-clear" title="Clear the list">clear</button>
       </div>
       <div class="caplisten" id="cap-listen"></div>
+      <div class="caphead" id="cap-head">
+        <span data-k="ts" class="cnum">TIME</span>
+        <span data-k="dir" style="text-align:center">DIR</span>
+        <span data-k="proto">PROTO</span>
+        <span data-k="peer">SOURCE → DESTINATION</span>
+        <span data-k="app">APP</span>
+        <span data-k="flags">FLAGS</span>
+        <span data-k="len" class="cnum">LEN</span>
+      </div>
       <div class="caplist" id="cap-list"><div class="caphint">press start to capture</div></div>
       <div class="cdump" id="cap-dump" hidden></div>
     </div>
@@ -2488,7 +2506,7 @@
 
     // ---- packet capture -------------------------------------------------
     const CAP = { rows: [], seq: 0, sel: null, auto: true, timer: 0,
-                  running: false, port: 0 };
+                  running: false, port: 0, sort: "ts", desc: false };
     const capList   = document.getElementById("cap-list");
     const capDump   = document.getElementById("cap-dump");
     const capListen = document.getElementById("cap-listen");
@@ -2514,6 +2532,34 @@
       return out || "(no payload)";
     }
 
+    const capApp = (p) => {
+      // Both ends when both are ours, which is every loopback conversation;
+      // picking one by direction only ever showed the port being watched.
+      const s = p.sapp || "", d = p.dapp || "";
+      if (s && d) return s === d ? s : `${s} → ${d}`;
+      return s || d || "";
+    };
+
+    function capSortVal(p, k) {
+      if (k === "peer") return `${p.src}:${String(p.sport ?? 0).padStart(5, "0")}`;
+      if (k === "app") return capApp(p).toLowerCase();
+      if (k === "len" || k === "ts") return p[k];
+      return String(p[k] ?? "");
+    }
+
+    function capSorted(rows) {
+      // Arrival order is the default and the only one that keeps the list
+      // readable while packets stream in.
+      if (CAP.sort === "ts" && !CAP.desc) return rows;
+      const out = rows.slice().sort((a, b) => {
+        const x = capSortVal(a, CAP.sort), y = capSortVal(b, CAP.sort);
+        if (x < y) return -1;
+        if (x > y) return 1;
+        return a.seq - b.seq;                 // stable: arrival order breaks ties
+      });
+      return CAP.desc ? out.reverse() : out;
+    }
+
     function capMatches(p) {
       const f = PS.filter.trim().toLowerCase();
       if (!f) return true;
@@ -2522,7 +2568,12 @@
     }
 
     function renderCap() {
-      const rows = CAP.rows.filter(capMatches);
+      const rows = capSorted(CAP.rows.filter(capMatches));
+      document.querySelectorAll("#cap-head span").forEach(s => {
+        const on = s.dataset.k === CAP.sort;
+        s.classList.toggle("sorted", on);
+        s.textContent = s.textContent.replace(/ [↑↓]$/, "") + (on ? (CAP.desc ? " ↓" : " ↑") : "");
+      });
       if (!rows.length) {
         capList.innerHTML = '<div class="caphint">' +
           (CAP.running ? "capturing — nothing matched yet" : "press start to capture") + "</div>";
@@ -2535,13 +2586,23 @@
           `<span class="cdir">${p.dir === "in" ? "▼" : "▲"}</span>` +
           `<span>${esc(p.proto)}</span>` +
           `<span class="cpeer">${esc(p.src)}:${p.sport ?? "-"} → ${esc(p.dst)}:${p.dport ?? "-"}</span>` +
+          `<span class="capp" title="${esc(appTitle(p))}">${esc(capApp(p) || "—")}</span>` +
           `<span class="cflags">${esc(p.flags || "")}</span>` +
           `<span class="cnum">${p.len}B</span></div>`;
       }).join("");
       capList.querySelectorAll(".crow").forEach(r => {
         r.onclick = () => { CAP.sel = Number(r.dataset.seq); renderCap(); showDump(); };
       });
-      if (CAP.auto && atBottom) capList.scrollTop = capList.scrollHeight;
+      if (CAP.auto && atBottom && CAP.sort === "ts" && !CAP.desc) {
+        capList.scrollTop = capList.scrollHeight;
+      }
+    }
+
+    function appTitle(p) {
+      const ends = [];
+      if (p.sapp) ends.push(`${p.sapp}${p.spid ? " (" + p.spid + ")" : ""} sent it`);
+      if (p.dapp) ends.push(`${p.dapp}${p.dpid ? " (" + p.dpid + ")" : ""} received it`);
+      return ends.join(", ") || "no local socket owns this port";
     }
 
     function showDump() {
@@ -2550,7 +2611,8 @@
       if (!p) return;
       capDump.textContent =
         `${p.proto} ${p.src}:${p.sport ?? "-"} → ${p.dst}:${p.dport ?? "-"}  ` +
-        `${p.flags || ""}  ${p.len} bytes on ${p.iface}\n\n` + hexdump(p.payload || "");
+        `${p.flags || ""}  ${p.len} bytes on ${p.iface}\n` +
+        appTitle(p) + "\n\n" + hexdump(p.payload || "");
     }
 
     function renderListen(d) {
@@ -2631,6 +2693,14 @@
       setTab("cap");
     }
     document.getElementById("fab-cap").onclick = toggleCap;
+    document.querySelectorAll("#cap-head span").forEach(s => {
+      s.onclick = () => {
+        const k = s.dataset.k;
+        CAP.desc = CAP.sort === k ? !CAP.desc : false;
+        CAP.sort = k;
+        renderCap();
+      };
+    });
     capRun.onclick = capToggle;
     window.addEventListener("pagehide", () => clearInterval(CAP.timer));
     document.getElementById("cap-auto").onclick = () => capAuto(!CAP.auto);

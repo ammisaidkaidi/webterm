@@ -828,6 +828,51 @@ CAP_LOCK = threading.Lock()          # guards the buffer, held only for moments
 CAP_BUSY = asyncio.Lock()            # serialises start/stop, which race otherwise
 
 
+CAP_APPS = {"map": {}, "at": 0.0}
+
+
+def cap_apps(max_age: float = 2.0) -> dict:
+    """(proto, port) -> (process name, pid) for every socket this machine owns.
+
+    Cached for a couple of seconds: it is one pass over every socket, and the
+    capture asks for it on every packet.
+    """
+    now = time.time()
+    if CAP_APPS["map"] and now - CAP_APPS["at"] < max_age:
+        return CAP_APPS["map"]
+    conns = None
+    if os.geteuid() != 0 and sudo_available():
+        conns = (sudo_helper("net", "") or {}).get("conns")
+    if conns is None:
+        try:
+            conns = do_net().get("conns", [])
+        except OSError:
+            conns = []
+    mapping = {}
+    for c in conns:
+        if c.get("lport") and c.get("pname"):
+            mapping.setdefault((c.get("proto", "")[:3], c["lport"]), (c["pname"], c.get("pid", 0)))
+    CAP_APPS.update(map=mapping, at=now)
+    return mapping
+
+
+def cap_name(pkt, which):
+    """Name the process on one end of a packet, blank when the socket is not ours.
+
+    A miss is worth one retry against a fresh table: a client socket that
+    opened after the last snapshot is exactly the case that matters, and
+    those are often gone seconds later.
+    """
+    port = pkt.get("sport" if which == "s" else "dport")
+    if not port:
+        return "", 0
+    key = (pkt.get("proto", ""), port)
+    hit = cap_apps().get(key)
+    if hit is None:
+        hit = cap_apps(max_age=0.5).get(key)
+    return hit or ("", 0)
+
+
 def cap_reader(proc):
     """Drain the sniffer's stdout into the ring buffer, one JSON line per packet."""
     for line in proc.stdout:
@@ -840,10 +885,16 @@ def cap_reader(proc):
             with CAP_LOCK:
                 CAP["error"] = line[:200]      # anything non-JSON is an error message
             continue
-        with CAP_LOCK:
-            if "dropped" in pkt:
+        if "dropped" in pkt:
+            with CAP_LOCK:
                 CAP["dropped"] += pkt["dropped"]
-                continue
+            continue
+        # Resolved here rather than when the UI asks, because a client socket
+        # can be closed and gone a second after its packet. Outside the lock:
+        # the lookup can shell out to sudo, and every poll waits on that lock.
+        (pkt["sapp"], pkt["spid"]) = cap_name(pkt, "s")
+        (pkt["dapp"], pkt["dpid"]) = cap_name(pkt, "d")
+        with CAP_LOCK:
             CAP["seq"] += 1
             pkt["seq"] = CAP["seq"]
             CAP["bytes"] += pkt.get("len", 0)
