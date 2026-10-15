@@ -315,8 +315,6 @@ mDNS is skipped while SSDP still runs.
 
 ## Packet capture
 
-![packet capture](screenshot-packets.png)
-
 The third floating button, above the process one (**Ctrl+Shift+K**), opens a
 **packets** tab: every packet crossing this machine, live, with its payload.
 
