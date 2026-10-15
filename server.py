@@ -20,6 +20,7 @@ import json
 import os
 import pty
 import pwd
+import re
 import shutil
 import signal
 import stat as statmod
@@ -656,7 +657,18 @@ async def api_svc_tools(token: str = ""):
     check_token(token)
     names = ["telnet", "nc", "ncat", "socat", "curl", "ftp", "lftp", "ncftp",
              "sftp", "ssh", "openssl", "mount.nfs", "showmount", "smbclient"]
-    return {"tools": {n: bool(shutil.which(n)) for n in names}}
+    tools = {n: bool(shutil.which(n)) for n in names}
+    # SMTP is a CRLF protocol. OpenBSD netcat has -C for that; the traditional
+    # one does not, and sending bare LF makes strict MTAs hang up.
+    tools["nc_crlf"] = False
+    if tools["nc"]:
+        try:
+            r = subprocess.run(["nc", "-h"], capture_output=True, text=True, timeout=5)
+            usage = (r.stdout or "") + (r.stderr or "")
+            tools["nc_crlf"] = bool(re.search(r"-[0-9a-zA-Z]*C", usage))
+        except Exception:                                      # noqa: BLE001
+            pass
+    return {"tools": tools}
 
 
 @app.post("/api/svc/ftp")

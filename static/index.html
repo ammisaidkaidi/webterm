@@ -1744,13 +1744,23 @@
               ["ncat", `ncat -v ${host} ${port}`],
               ["socat", `socat - TCP:${host}:${port}`],
               ["telnet", `telnet ${host} ${port}`]],
+        // SMTP wants CRLF, and implicit/opportunistic TLS wants openssl
         smtp: (port === 465 || port === 8465)
           ? [["openssl", `openssl s_client -crlf -connect ${host}:${port}`],
-             ["nc", `nc -v ${host} ${port}`]]
-          : [["nc", `nc -crlf ${host} ${port}`.replace(" -crlf", "")],
-             ["ncat", `ncat -C ${host} ${port}`],
-             ["telnet", `telnet ${host} ${port}`],
-             ["socat", `socat - TCP:${host}:${port},crlf`]],
+             ["nc_crlf", `nc -C ${host} ${port}`],
+             ["nc", `nc ${host} ${port}`]]
+          : (SVC.starttls
+              ? [["openssl", `openssl s_client -starttls smtp -crlf -connect ${host}:${port}`],
+                 ["nc_crlf", `nc -C ${host} ${port}`],
+                 ["ncat", `ncat -C ${host} ${port}`],
+                 ["telnet", `telnet ${host} ${port}`],
+                 ["socat", `socat - TCP:${host}:${port},crlf`],
+                 ["nc", `nc ${host} ${port}`]]
+              : [["nc_crlf", `nc -C ${host} ${port}`],
+                 ["ncat", `ncat -C ${host} ${port}`],
+                 ["telnet", `telnet ${host} ${port}`],
+                 ["socat", `socat - TCP:${host}:${port},crlf`],
+                 ["nc", `nc ${host} ${port}`]]),
         nfs: [["mount.nfs", `sudo mkdir -p /mnt/nfs && sudo mount -t nfs ${host}:${SVC.nfsPath || "/export"} /mnt/nfs`],
               ["showmount", `showmount -e ${host}`]],
         http: [["curl", `curl -i http://${host}:${port}/`]],
@@ -1862,9 +1872,12 @@
     /* ---- SMTP: capabilities, STARTTLS, certificate ---- */
     async function svcSmtp() {
       let d;
+      SVC.starttls = false;
       try { d = await svcPost("/api/svc/smtp", { host: SVC.host, port: SVC.port }); }
       catch (e) { svcBody.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
       if (!d) { closeSvc(); return; }
+      SVC.starttls = !!d.starttls && SVC.port !== 465 && SVC.port !== 8465;
+      paintTermButton();
       let h = table(["greeting", "ESMTP", "STARTTLS", "size limit"], [[
         `<span class="ok">${esc(d.banner || "")}</span>`,
         d.esmtp ? "yes" : "no",

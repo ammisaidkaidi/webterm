@@ -285,9 +285,15 @@ ship without `telnet` or `ftp`:
 | ssh | `ssh -p <port> <host>` |
 | ftp | `ftp` → `lftp` → `ncftp` → `curl ftp://…` with the credentials you logged in with |
 | telnet | `telnet` → `nc -v` → `ncat -v` → `socat -,raw,echo=0 TCP:…` |
-| smtp | `nc` → `ncat -C` → `telnet` → `socat`, or `openssl s_client -crlf` on port 465 |
+| smtp | `openssl s_client -starttls smtp -crlf` when the probe saw STARTTLS (or `-crlf` alone on 465), else `nc -C` → `ncat -C` → `telnet` → `socat …,crlf` |
 | nfs | `sudo mount -t nfs <host>:<share> /mnt/<share>`, else `showmount -e` |
 | raw | `nc` → `ncat` → `socat` → `telnet` |
+
+SMTP is a CRLF protocol: bare LF makes strict MTAs hang up, so the button never offers a
+plain `nc` when a CRLF-capable client exists. `/api/svc/tools` reports `nc_crlf` by
+reading `nc -h` — OpenBSD netcat has `-C`, the traditional one does not. When the probe
+found STARTTLS the command becomes `openssl s_client -starttls smtp`, which puts you
+inside the encrypted session rather than at a plaintext prompt that will refuse AUTH.
 
 When none of them exist the button is disabled and names what is missing, pointing at the
 built-in console instead — that one needs nothing installed, since the server opens the
