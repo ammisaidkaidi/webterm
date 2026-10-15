@@ -1,0 +1,48 @@
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    # Syntax, lint, the inline <script>, and the two greps in dev/check.sh.
+    # Seconds, no browser.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: sh dev/check.sh
+      - run: ruff check server.py netscan.py dev tests
+
+  e2e:
+    # The browser suite. The fake FTP/telnet/SMTP servers bind privileged
+    # ports, so they run under sudo; tests whose service is missing skip
+    # rather than fail.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: playwright install --with-deps chromium
+      - name: Start the fixture services
+        run: |
+          sudo -E env "PATH=$PATH" python3 dev/fixtures.py &
+          for _ in $(seq 20); do
+            if (echo > /dev/tcp/127.0.0.1/21) 2>/dev/null; then break; fi
+            sleep 1
+          done
+      - name: Create the second account the user switcher needs
+        run: sudo useradd -m -s /bin/bash user1
+      - run: python3 -m pytest tests -v

@@ -284,8 +284,13 @@ async def api_ls(path: str = "", sid: str = "", token: str = "", hidden: int = 0
     check_token(token)
     target = resolve(path, sid)
     try:
-        if not os.path.isdir(target):
-            raise HTTPException(status_code=404, detail="not a directory")
+        try:
+            if not statmod.S_ISDIR(os.stat(target).st_mode):
+                raise HTTPException(status_code=404, detail="not a directory")
+        except PermissionError:
+            pass          # cannot stat it from here: let do_ls try, then sudo
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="no such directory") from None
         return do_ls(target, hidden)
     except PermissionError:
         out = sudo_helper("ls", target, hidden=hidden)       # retry as root
@@ -886,10 +891,10 @@ async def api_download(path: str, token: str = ""):
     check_token(token)
     p = os.path.realpath(os.path.expanduser(path))
 
-    if os.path.isfile(p):
+    if os.path.isfile(p):   # eperm-ok: a file we cannot stat is one we could not stream either
         return FileResponse(p, filename=os.path.basename(p), media_type="application/octet-stream")
 
-    if not os.path.isdir(p):
+    if not os.path.isdir(p):   # eperm-ok: same, download has no sudo path
         raise HTTPException(status_code=404, detail="no such path")
 
     tmp = tempfile.NamedTemporaryFile(prefix="webterm-", suffix=".zip", delete=False)
@@ -906,7 +911,7 @@ async def api_download(path: str, token: str = ""):
                     z.writestr(os.path.join(base, rel_root) + "/", "")
                 for f in files:
                     full = os.path.join(root, f)
-                    if os.path.islink(full) or not os.path.isfile(full):
+                    if os.path.islink(full) or not os.path.isfile(full):   # eperm-ok: inside a tree we are already reading
                         continue
                     try:
                         z.write(full, os.path.join(base, rel_root, f))
@@ -1063,7 +1068,7 @@ async def api_write(body: dict = Body(...)):
     check_token(body.get("token", ""))
     p = os.path.realpath(os.path.expanduser(body.get("path", "")))
     text = body.get("text", "")
-    if os.path.isdir(p):
+    if os.path.isdir(p):   # eperm-ok: a false negative falls through to open(), which retries under sudo
         raise HTTPException(status_code=400, detail="path is a directory")
 
     base = body.get("mtime")
@@ -1202,7 +1207,7 @@ async def api_delete(body: dict = Body(...)):
     if p == "/" or p == os.path.expanduser("~"):
         raise HTTPException(status_code=400, detail="refusing to delete that")
     try:
-        if os.path.isdir(p) and not os.path.islink(p):
+        if os.path.isdir(p) and not os.path.islink(p):   # eperm-ok: a false negative falls through to the sudo rm
             shutil.rmtree(p)
         else:
             os.remove(p)

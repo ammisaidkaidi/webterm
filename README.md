@@ -352,6 +352,72 @@ JSON over a single WebSocket at `/ws?rows=&cols=`:
 
 `GET /healthz` → `{"ok":true}` for uptime checks.
 
+## Development
+
+`run.sh` is the launcher: it installs `requirements.txt` on first run and then
+execs `server.py`, passing through any arguments. Everything the checks need
+is in `requirements-dev.txt`.
+
+```sh
+pip install -r requirements.txt -r requirements-dev.txt
+playwright install chromium
+sh dev/check.sh            # syntax, lint, the inline script, two greps
+sh dev/check.sh --tests    # the above, plus the browser suite
+```
+
+### Checks
+
+`dev/check.sh` is the one command to run, locally or in CI. A ready GitHub
+Actions workflow lives at `dev/github-workflow.yml`; copy it to
+`.github/workflows/check.yml` to switch CI on (pushing that path needs a token
+with the `workflow` scope).
+
+Beyond syntax and `ruff`, it guards two Beyond syntax and `ruff`, it guards
+mistakes this codebase has actually made:
+
+- **The inline `<script>`.** The whole UI is one `<script>` block in
+  `static/index.html`, so nothing else ever parses it; the script extracts it
+  and runs `node --check`. That catches duplicate declarations and syntax
+  errors, but *not* temporal-dead-zone errors, which only show up at runtime.
+  The browser suite covers those by failing on any page error.
+- **Existence checks on paths the server may not own.** `os.path.isfile()` and
+  `os.path.isdir()` both return `False` on `EPERM`, which turns "you are not
+  allowed" into "it does not exist" and skips the sudo retry. Use `os.stat()`
+  and catch `PermissionError`, or mark a deliberate use with
+  `# eperm-ok: <why>`.
+- **Hardcoded client binaries.** Any `telnet`/`ftp`/`mount.nfs` command offered
+  to the user has to come from `/api/svc/tools` first.
+
+### Tests
+
+`tests/` drives a real browser through the UI with Playwright: one file per
+feature, 166 named checks.
+
+```sh
+python3 -m pytest tests -v          # all of it, about four minutes
+python3 -m pytest tests/test_editor.py -v
+```
+
+Each file walks its feature in sequence and records every check, so a run
+reports all its failures rather than stopping at the first. Fixtures in
+`tests/conftest.py` start a server on port 7681 if one isn't already running
+(`WEBTERM_URL` points at another), rebuild the files the editor tests edit,
+and fail a test if the page raised any JavaScript error.
+
+Anything the suite cannot create itself is a **skip, not a failure**, so a
+partial environment still runs what it can:
+
+| needs | to enable it |
+|---|---|
+| the FTP, telnet and SMTP service views | `sudo python3 dev/fixtures.py` |
+| the user switcher | `sudo useradd -m -s /bin/bash user1` |
+| the root-owned file in the properties test | passwordless `sudo` |
+
+`dev/fixtures.py` runs three throwaway servers on ports 21, 23 and 25: an
+anonymous FTP server over `/tmp/ftproot`, a toy telnet device, and an ESMTP
+greeter that advertises STARTTLS and completes the handshake with a
+self-signed certificate it generates on first run.
+
 ## Security — read this
 
 This is remote code execution by design. Anyone who can reach the port gets a shell as the

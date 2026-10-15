@@ -1,0 +1,13 @@
+# Everything the checks need, on top of requirements.txt.
+#
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   playwright install chromium
+#   sudo playwright install-deps chromium
+#
+# Then, in another shell, the fake services the service tests connect to:
+#   sudo python3 dev/fixtures.py
+
+pytest>=8.0
+pytest-playwright>=0.5
+ruff>=0.6
+pyftpdlib>=1.5        # the fake FTP server in dev/fixtures.py

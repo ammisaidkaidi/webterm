@@ -1,0 +1,16 @@
+# Configuration only — webterm is run as scripts, not installed as a package.
+
+[tool.ruff]
+line-length = 110
+exclude = ["static/vendor"]
+
+[tool.ruff.lint]
+# Imports, undefined names and real syntax errors. The E7 group is left out on
+# purpose: the browser tests are written as dense one-liners
+# (`pg.click(...); time.sleep(.4)`), which reads better for a UI walkthrough
+# than one statement per line, and E702 would reject every one of them.
+select = ["E4", "E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
