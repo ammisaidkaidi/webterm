@@ -272,11 +272,26 @@ server on 8081 still offers **open** rather than a raw socket.
 | nfs | nfs | portmap dump of every registered RPC program, then the mountd export list with a **mount** button per share |
 | anything else | connect | the raw TCP console |
 
-Each view also has **open in terminal**, which hands the job to the real shell: `ssh -p
-<port> <host>`, `ftp`, `telnet`, `nc`, or for NFS a full
-`sudo mkdir -p /mnt/<share> && sudo mount -t nfs <host>:<share> /mnt/<share>`. The panel
+Each view also has **open in terminal**, which hands the job to the real shell. The panel
 closes and the command is typed for you — useful the moment you need interactive auth,
 which the read-only probes deliberately do not do.
+
+`GET /api/svc/tools` reports which clients are actually installed (`shutil.which`), and
+the button offers the first one that exists rather than assuming. Plenty of containers
+ship without `telnet` or `ftp`:
+
+| service | tried in this order |
+|---|---|
+| ssh | `ssh -p <port> <host>` |
+| ftp | `ftp` → `lftp` → `ncftp` → `curl ftp://…` with the credentials you logged in with |
+| telnet | `telnet` → `nc -v` → `ncat -v` → `socat -,raw,echo=0 TCP:…` |
+| smtp | `nc` → `ncat -C` → `telnet` → `socat`, or `openssl s_client -crlf` on port 465 |
+| nfs | `sudo mount -t nfs <host>:<share> /mnt/<share>`, else `showmount -e` |
+| raw | `nc` → `ncat` → `socat` → `telnet` |
+
+When none of them exist the button is disabled and names what is missing, pointing at the
+built-in console instead — that one needs nothing installed, since the server opens the
+socket.
 
 The SSH probe uses paramiko for the host key and the algorithm lists come from parsing
 the server's `SSH_MSG_KEXINIT` directly. NFS speaks ONC-RPC over TCP by hand — portmap

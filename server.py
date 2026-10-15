@@ -650,6 +650,15 @@ SVC_PORTS = {                       # port -> which service view the UI should o
 }
 
 
+@app.get("/api/svc/tools")
+async def api_svc_tools(token: str = ""):
+    """Which command-line clients exist here, so the UI only offers real ones."""
+    check_token(token)
+    names = ["telnet", "nc", "ncat", "socat", "curl", "ftp", "lftp", "ncftp",
+             "sftp", "ssh", "openssl", "mount.nfs", "showmount", "smbclient"]
+    return {"tools": {n: bool(shutil.which(n)) for n in names}}
+
+
 @app.post("/api/svc/ftp")
 async def api_svc_ftp(req: Request):
     body = await req.json()
@@ -752,13 +761,15 @@ async def ws_raw(ws: WebSocket, host: str = "", port: int = 23,
                 if not data:
                     break
                 await ws.send_text(data.decode("utf-8", "replace"))
-        except (OSError, RuntimeError):
+        except asyncio.CancelledError:      # the browser went away; say nothing
+            raise
+        except Exception:                                      # noqa: BLE001
             pass
-        finally:
-            try:
+        else:
+            try:                            # only the remote end hanging up gets a notice
                 await ws.send_text("\r\n[remote closed]\r\n")
                 await ws.close()
-            except RuntimeError:
+            except Exception:                                  # noqa: BLE001
                 pass
 
     task = asyncio.create_task(pump())

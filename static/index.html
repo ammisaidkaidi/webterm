@@ -184,6 +184,7 @@
             border-bottom:1px solid var(--p-line); }
   .svchead b{ font-weight:500; font-size:12.5px; }
   .svchead .spacer{ flex:1; }
+  .svchead .dtool:disabled{ opacity:.45; cursor:default; }
   .svcbody{ flex:1; overflow:auto; padding:10px 12px; font-size:12px; line-height:1.55; }
   .svcbody table{ border-collapse:collapse; width:100%; margin:2px 0 10px; }
   .svcbody th{ text-align:left; font-weight:400; font-size:11px; letter-spacing:.06em;
@@ -1704,6 +1705,7 @@
       svcLine.hidden = kind !== "telnet" && kind !== "raw" && kind !== "smtp";
       svcView.hidden = false;
       svcTermBtn.hidden = false;
+      paintTermButton();
       ({ ftp: svcFtp, ssh: svcSsh, smtp: svcSmtp, nfs: svcNfs,
          telnet: svcRaw, raw: svcRaw }[kind] || svcRaw)();
     }
@@ -1715,19 +1717,71 @@
     }
     document.getElementById("svc-back").onclick = closeSvc;
 
-    // "open in terminal" hands the session to the real shell, which has real clients
+    // "open in terminal" hands the session to the real shell — but only ever
+    // suggests a client that is actually installed on this machine.
+    let BINS = null;                      // which CLI clients this machine has
+    async function loadBins() {
+      if (BINS) return BINS;
+      try { BINS = (await (await fetch(api("/api/svc/tools", {}))).json()).tools; }
+      catch (e) { BINS = {}; }
+      return BINS;
+    }
+
+    function termCommand(kind, host, port, tools) {
+      const has = (n) => tools && tools[n];
+      const chain = {
+        ssh: [["ssh", `ssh -p ${port} ${host}`]],
+        sftp: [["sftp", `sftp -P ${port} ${host}`]],
+        ftp: [["ftp", `ftp ${host} ${port}`],
+              ["lftp", `lftp -p ${port} ${host}`],
+              ["ncftp", `ncftp -P ${port} ${host}`],
+              ["curl", `curl -u ${SVC.user}:${SVC.pass} "ftp://${host}:${port}${SVC.path || "/"}"`]],
+        telnet: [["telnet", `telnet ${host} ${port}`],
+                 ["nc", `nc -v ${host} ${port}`],
+                 ["ncat", `ncat -v ${host} ${port}`],
+                 ["socat", `socat -,raw,echo=0 TCP:${host}:${port}`]],
+        raw: [["nc", `nc -v ${host} ${port}`],
+              ["ncat", `ncat -v ${host} ${port}`],
+              ["socat", `socat - TCP:${host}:${port}`],
+              ["telnet", `telnet ${host} ${port}`]],
+        smtp: (port === 465 || port === 8465)
+          ? [["openssl", `openssl s_client -crlf -connect ${host}:${port}`],
+             ["nc", `nc -v ${host} ${port}`]]
+          : [["nc", `nc -crlf ${host} ${port}`.replace(" -crlf", "")],
+             ["ncat", `ncat -C ${host} ${port}`],
+             ["telnet", `telnet ${host} ${port}`],
+             ["socat", `socat - TCP:${host}:${port},crlf`]],
+        nfs: [["mount.nfs", `sudo mkdir -p /mnt/nfs && sudo mount -t nfs ${host}:${SVC.nfsPath || "/export"} /mnt/nfs`],
+              ["showmount", `showmount -e ${host}`]],
+        http: [["curl", `curl -i http://${host}:${port}/`]],
+        https: [["curl", `curl -ik https://${host}:${port}/`]],
+      }[kind] || [];
+      for (const [bin, cmd] of chain) if (has(bin)) return { cmd, bin };
+      return { cmd: "", bin: "", missing: chain.map(c => c[0]) };
+    }
+
+    async function paintTermButton() {
+      const tools = await loadBins();
+      const { cmd, missing } = termCommand(SVC.kind, SVC.host, SVC.port, tools);
+      SVC.cmd = cmd;
+      if (cmd) {
+        svcTermBtn.disabled = false;
+        svcTermBtn.textContent = "open in terminal";
+        svcTermBtn.title = cmd;
+      } else {
+        svcTermBtn.disabled = true;
+        svcTermBtn.textContent = "no client installed";
+        svcTermBtn.title = (missing || []).length
+          ? `none of these are installed: ${missing.join(", ")}` +
+            (svcLine.hidden ? "" : " — use the console below instead")
+          : "nothing to run for this service";
+      }
+    }
+
     svcTermBtn.onclick = () => {
-      const h = q(SVC.host), p = SVC.port;
-      const cmd = {
-        ssh: `ssh -p ${p} ${SVC.host}`,
-        ftp: `ftp ${SVC.host} ${p}`,
-        telnet: `telnet ${SVC.host} ${p}`,
-        smtp: `nc ${SVC.host} ${p}`,
-        raw: `nc ${SVC.host} ${p}`,
-        nfs: `sudo mount -t nfs ${SVC.host}:${SVC.nfsPath || "/export"} /mnt`,
-      }[SVC.kind] || `nc ${SVC.host} ${p}`;
-      send({ t: "i", d: "\x15" + cmd + "\n" });
-      closePs(); term.focus(); flash(cmd.split(" ")[0]);
+      if (!SVC.cmd) return;
+      send({ t: "i", d: "\x15" + SVC.cmd + "\n" });
+      closePs(); term.focus(); flash(SVC.cmd.split(" ")[0]);
     };
 
     /* ---- FTP: a tiny file browser over the control connection ---- */
@@ -1839,6 +1893,7 @@
       if (d.error) h += `<div class="bad">${esc(d.error)}</div>`;
       if ((d.exports || []).length) {
         SVC.nfsPath = d.exports[0].path;
+        paintTermButton();
         h += `<h4>EXPORTS (${esc(d.source)})</h4>` + table(["path", "allowed clients", ""],
           d.exports.map(e => [`<span class="ok">${esc(e.path)}</span>`,
             esc((e.clients || []).join(", ")),
