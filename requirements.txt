@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+dnspython>=2.6
+cryptography>=42
+zeroconf>=0.132
+paramiko>=3.4

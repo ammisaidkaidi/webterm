@@ -36,6 +36,43 @@
     border-bottom:1px solid var(--line); background:var(--panel);
     user-select:none;
   }
+  .nav{ display:flex; gap:2px; flex:0 0 auto; margin-left:-4px; }
+  .navb{
+    display:flex; align-items:center; justify-content:center;
+    width:26px; height:24px; padding:0; cursor:pointer;
+    background:transparent; border:1px solid transparent; border-radius:6px;
+    color:var(--dim);
+  }
+  .navb svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2;
+             stroke-linecap:round; stroke-linejoin:round; }
+  .navb:hover:not(:disabled){ color:var(--fg); background:var(--hit); border-color:var(--line); }
+  .navb:active:not(:disabled){ transform:translateY(1px); }
+  .navb:disabled{ opacity:.3; cursor:default; }
+  .navb.user{ width:auto; gap:5px; padding:0 7px; max-width:160px; }
+  .navb.user #nav-user-name{ font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .navb.user .caret{ width:12px; height:12px; opacity:.7; }
+  .navb.user.root{ color:var(--warn, #e06c75); }
+  .navb.user.on{ color:var(--fg); background:var(--hit); border-color:var(--line); }
+  .userwrap{ position:relative; flex:0 0 auto; }
+  .umenu{
+    position:absolute; top:30px; left:0; z-index:60; min-width:208px; max-height:340px;
+    overflow:auto; padding:4px; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; box-shadow:0 10px 28px rgba(0,0,0,.35);
+  }
+  .umenu .ug{ padding:6px 9px 3px; font-size:11px; letter-spacing:.06em; color:var(--dim); opacity:.75; }
+  .umenu button{
+    display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+    font:inherit; font-size:13px; color:var(--fg); background:transparent;
+    border:0; border-radius:6px; padding:5px 9px; cursor:pointer;
+  }
+  .umenu button:hover{ background:var(--hit); }
+  .umenu button .uid{ margin-left:auto; font-size:11px; color:var(--dim); }
+  .umenu button.cur{ color:var(--ok); }
+  .umenu button.cur::after{ content:"✓"; margin-left:auto; font-size:11px; }
+  .umenu button.cur .uid{ margin-left:8px; }
+  .umenu hr{ border:0; border-top:1px solid var(--line); margin:4px 2px; }
+  .hsep{ margin:0 2px; }
+  @media (max-width:420px){ .hsep{ display:none; } .nav{ gap:0; } }
   .dot{ width:7px; height:7px; border-radius:50%; background:var(--off); flex:0 0 auto; transition:background .2s; }
   .dot.on{ background:var(--ok); }
   .title{ color:var(--dim); letter-spacing:.04em; }
@@ -91,6 +128,145 @@
   .fab:hover{ border-color:var(--dim); }
   .fab:active{ transform:scale(.94); }
   .fab svg{ width:20px; height:20px; }
+  .fab.top{ bottom:calc(114px + env(safe-area-inset-bottom)); }
+
+  /* process viewer — palette lifted from the Ace themes (one_dark / textmate) */
+  .psdrawer{
+    --p-bg:#282c34; --p-panel:#21252b; --p-line:#3e4451; --p-fg:#abb2bf;
+    --p-dim:#5c6370; --p-hit:#2c313a; --p-sel:#3e4451; --p-accent:#61afef; --p-warn:#e06c75;
+    position:fixed; top:0; right:0; height:100%; width:min(760px,96vw);
+    transform:translateX(100%); transition:transform .2s ease;
+    z-index:52; display:flex; flex-direction:column;
+    background:var(--p-bg); color:var(--p-fg); border-left:1px solid var(--p-line);
+    font:12.5px/1.4 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  body.light-ace .psdrawer{
+    --p-bg:#ffffff; --p-panel:#f6f6f6; --p-line:#e0e0e0; --p-fg:#1f1f1f;
+    --p-dim:#8a8a8a; --p-hit:#f0f0f0; --p-sel:#d6ebff; --p-accent:#0b84ff; --p-warn:#c0392b;
+  }
+  body.procs .psdrawer{ transform:none; }
+  body.procs .scrim{ opacity:1; pointer-events:auto; }
+  .psdrawer .ptop, .psdrawer .pfoot{
+    display:flex; align-items:center; gap:7px; padding:8px 10px; flex:0 0 auto;
+    background:var(--p-panel); border-bottom:1px solid var(--p-line);
+  }
+  .psdrawer .pfoot{ border-bottom:0; border-top:1px solid var(--p-line); font-size:11px; color:var(--p-dim); }
+  .psdrawer b{ font-weight:600; letter-spacing:.03em; }
+  .psdrawer .pmini{
+    font:inherit; font-size:11.5px; color:var(--p-dim); background:transparent;
+    border:1px solid var(--p-line); border-radius:6px; padding:3px 8px; cursor:pointer;
+  }
+  .psdrawer .pmini:hover{ color:var(--p-fg); border-color:var(--p-dim); }
+  .psdrawer .pmini.on{ color:var(--p-bg); background:var(--p-accent); border-color:var(--p-accent); }
+  .psdrawer .pmini.danger:hover{ color:var(--p-warn); border-color:var(--p-warn); }
+  .psdrawer .pmini[disabled]{ opacity:.35; cursor:default; }
+  .psdrawer input.filter{
+    flex:1; min-width:60px; font:inherit; font-size:12px; color:var(--p-fg);
+    background:var(--p-bg); border:1px solid var(--p-line); border-radius:6px; padding:3px 8px;
+  }
+  .psdrawer input.filter::placeholder{ color:var(--p-dim); }
+  .psdrawer .tabs{ display:flex; gap:4px; flex:0 0 auto; }
+  .psdrawer .tab{
+    font:inherit; font-size:12px; color:var(--p-dim); background:transparent;
+    border:1px solid transparent; border-radius:6px; padding:3px 10px; cursor:pointer;
+  }
+  .psdrawer .tab:hover{ color:var(--p-fg); }
+  .psdrawer .tab.on{ color:var(--p-fg); border-color:var(--p-line); background:var(--p-hit); }
+  #net-head, body.nettab .prow{
+    grid-template-columns:52px 1fr 1fr 96px 74px 128px !important;
+  }
+  .dpane{ display:flex; flex-direction:column; min-height:0; flex:1; }
+  .dpane[hidden]{ display:none; }
+  .svcview{ position:absolute; inset:0; display:flex; flex-direction:column;
+            background:var(--p-bg); z-index:5; }
+  .svcview[hidden]{ display:none; }
+  .svchead{ display:flex; align-items:center; gap:8px; padding:8px 10px;
+            border-bottom:1px solid var(--p-line); }
+  .svchead b{ font-weight:500; font-size:12.5px; }
+  .svchead .spacer{ flex:1; }
+  .svcbody{ flex:1; overflow:auto; padding:10px 12px; font-size:12px; line-height:1.55; }
+  .svcbody table{ border-collapse:collapse; width:100%; margin:2px 0 10px; }
+  .svcbody th{ text-align:left; font-weight:400; font-size:11px; letter-spacing:.06em;
+               color:var(--p-dim); padding:2px 8px 4px 0; border-bottom:1px solid var(--p-line); }
+  .svcbody td{ padding:2px 8px; vertical-align:top; border-bottom:1px solid var(--p-line); }
+  .svcbody h4{ margin:10px 0 4px; font-size:11px; letter-spacing:.07em; color:var(--p-dim); font-weight:400; }
+  .svcbody h4:first-child{ margin-top:0; }
+  .svcbody .ok{ color:var(--p-accent); } .svcbody .bad{ color:var(--p-warn); }
+  .svcbody pre{ margin:0; white-space:pre-wrap; word-break:break-word; }
+  .svcbody .console{ font-size:11.5px; line-height:1.45; }
+  .svcbody .fitem{ cursor:pointer; color:var(--p-accent); }
+  .svcbody .fitem:hover{ text-decoration:underline; }
+  .svcline[hidden]{ display:none; }
+  .svcline{ display:flex; gap:6px; padding:8px 10px; border-top:1px solid var(--p-line); }
+  .svcline input{ flex:1; font:inherit; font-size:12px; color:var(--p-fg);
+                  background:var(--p-panel); border:1px solid var(--p-line);
+                  border-radius:6px; padding:5px 8px; }
+  .svcline button{ font:inherit; font-size:12px; color:var(--p-bg); background:var(--p-accent);
+                   border:0; border-radius:6px; padding:5px 12px; cursor:pointer; }
+  .dpane{ position:relative; }
+  .pact{ font:inherit; font-size:11px; color:var(--p-accent); background:transparent;
+         border:1px solid var(--p-line); border-radius:5px; padding:1px 7px; cursor:pointer; }
+  .pact:hover{ background:var(--p-hit); }
+  .dtools{ display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px 6px; border-bottom:1px solid var(--p-line); }
+  .dtool{
+    font:inherit; font-size:11.5px; color:var(--p-dim); background:transparent;
+    border:1px solid var(--p-line); border-radius:999px; padding:3px 9px; cursor:pointer;
+  }
+  .dtool:hover{ color:var(--p-fg); }
+  .dtool.on{ color:var(--p-bg); background:var(--p-accent); border-color:var(--p-accent); }
+  .dform{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--p-line); }
+  .dform input, .dform select{
+    font:inherit; font-size:12px; color:var(--p-fg); background:var(--p-panel);
+    border:1px solid var(--p-line); border-radius:6px; padding:4px 7px; min-width:0;
+  }
+  .dform input[type=text]{ flex:1 1 150px; }
+  .dform input.narrow{ flex:0 0 72px; }
+  .dform label{ font-size:11.5px; color:var(--p-dim); display:flex; align-items:center; gap:4px; }
+  .dform button{
+    font:inherit; font-size:12px; color:var(--p-bg); background:var(--p-accent);
+    border:0; border-radius:6px; padding:5px 12px; cursor:pointer;
+  }
+  .dform button:disabled{ opacity:.5; cursor:default; }
+  .dout{ flex:1; overflow:auto; padding:10px 12px; font-size:12px; line-height:1.55; }
+  .dhint{ color:var(--p-dim); }
+  .derr{ color:var(--p-warn); white-space:pre-wrap; }
+  .dout table{ border-collapse:collapse; width:100%; margin:2px 0 10px; }
+  .dout th{ text-align:left; font-weight:400; font-size:11px; letter-spacing:.06em;
+            color:var(--p-dim); padding:2px 8px 4px 0; border-bottom:1px solid var(--p-line); }
+  .dout td{ padding:2px 8px 2px 0; vertical-align:top; border-bottom:1px solid var(--p-line); }
+  .dout tr:last-child td{ border-bottom:0; }
+  .dout h4{ margin:10px 0 4px; font-size:11px; letter-spacing:.07em; color:var(--p-dim); font-weight:400; }
+  .dout h4:first-child{ margin-top:0; }
+  .dout .ok{ color:var(--p-accent); }
+  .dout .bad{ color:var(--p-warn); }
+  .dout pre{ margin:0; white-space:pre-wrap; word-break:break-word; color:var(--p-fg); }
+  .dbar{ display:inline-block; height:7px; background:var(--p-accent); border-radius:2px; vertical-align:middle; }
+  .prow .nlisten{ color:var(--p-accent); }
+  .prow .nstate{ color:var(--p-dim); }
+  .phead, .prow{
+    display:grid; grid-template-columns:62px 74px 58px 74px 34px 1fr;
+    align-items:center; gap:8px; padding:0 10px;
+  }
+  .phead{
+    height:24px; flex:0 0 auto; font-size:11px; color:var(--p-dim);
+    border-bottom:1px solid var(--p-line); user-select:none; background:var(--p-panel);
+  }
+  .phead span{ cursor:pointer; overflow:hidden; text-overflow:ellipsis; }
+  .phead span:hover{ color:var(--p-fg); }
+  .phead .active{ color:var(--p-accent); }
+  .plist{ flex:1; overflow:auto; }
+  .prow{ height:23px; cursor:default; white-space:nowrap; }
+  .prow:hover{ background:var(--p-hit); }
+  .prow.sel{ background:var(--p-sel); }
+  .prow.mine .ppid{ color:var(--p-accent); }
+  .prow .pcmd{ overflow:hidden; text-overflow:ellipsis; color:var(--p-fg); }
+  .prow .pcpu.hot{ color:var(--p-warn); }
+  .prow span{ overflow:hidden; text-overflow:ellipsis; }
+  .pnum{ text-align:right; }
+  @media (max-width:620px){
+    .phead, .prow{ grid-template-columns:58px 54px 58px 34px 1fr; }
+    .phead .puser, .prow .puser{ display:none; }
+  }
 
   /* file browser */
   .scrim{
@@ -188,6 +364,28 @@
   .menu i.danger{ color:var(--off); }
   .menu hr{ border:0; border-top:1px solid var(--line); margin:4px 2px; }
 
+  /* notepad / editor */
+  .editwrap{
+    position:fixed; inset:0; z-index:65; display:none;
+    align-items:center; justify-content:center; background:rgba(0,0,0,.5);
+  }
+  .editwrap.show{ display:flex; }
+  .editor{
+    width:min(1000px,96vw); height:min(760px,92vh);
+    display:flex; flex-direction:column;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45); overflow:hidden;
+  }
+  .ehead, .efoot{ display:flex; align-items:center; gap:8px; padding:8px 10px; }
+  .ehead{ border-bottom:1px solid var(--line); }
+  .ehead b{ font-weight:600; max-width:46%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ehead .meta{ font-size:11px; color:var(--dim); }
+  .dirty{ color:var(--ok); font-size:11px; visibility:hidden; }
+  .dirty.on{ visibility:visible; }
+  .efoot{ border-top:1px solid var(--line); font-size:11px; color:var(--dim); }
+  #e-area{ flex:1; min-height:0; width:100%; }
+  .ace_editor{ font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace !important; font-size:13px; }
+
   /* properties dialog */
   .modalwrap{
     position:fixed; inset:0; z-index:70; display:none;
@@ -248,6 +446,26 @@
 </head>
 <body>
   <header>
+    <span class="nav" id="nav">
+      <button class="navb" id="nav-back" title="Back" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <button class="navb" id="nav-up" title="Parent folder (cd ..)">
+        <svg viewBox="0 0 24 24"><path d="M12 19V6M5 13l7-7 7 7"/></svg>
+      </button>
+      <button class="navb" id="nav-fwd" title="Forward" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </span>
+    <span class="userwrap">
+      <button class="navb user" id="nav-user" title="Switch user">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/></svg>
+        <span id="nav-user-name">…</span>
+        <svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="umenu" id="umenu" hidden></div>
+    </span>
+    <span class="sep hsep"></span>
     <span class="dot" id="dot"></span>
     <span class="title" id="status">connecting</span>
     <span class="spacer"></span>
@@ -269,6 +487,67 @@
     </svg>
   </button>
 
+  <button class="fab top" id="fab-ps" title="Processes (Ctrl+Shift+P)" aria-label="open process viewer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="8" width="8" height="8" rx="1.5"/>
+      <path d="M4 10h4M4 14h4M16 10h4M16 14h4M10 4v4M14 4v4M10 16v4M14 16v4"/>
+    </svg>
+  </button>
+
+  <aside class="psdrawer" id="psdrawer" aria-label="process viewer">
+    <div class="ptop">
+      <span class="tabs">
+        <button class="tab on" id="tab-ps" data-tab="ps">processes</button>
+        <button class="tab" id="tab-net" data-tab="net">connections</button>
+        <button class="tab" id="tab-disc" data-tab="disc">network</button>
+      </span>
+      <input class="filter" id="ps-filter" placeholder="filter by name, user or pid" spellcheck="false">
+      <button class="pmini" id="ps-auto" title="Auto-refresh every 2s">auto</button>
+      <button class="pmini" id="ps-reload" title="Refresh now">↻</button>
+      <button class="pmini" id="ps-close" title="Close (Esc)">✕</button>
+    </div>
+    <div class="phead" id="ps-head">
+      <span class="pnum" data-k="pid">PID</span>
+      <span class="puser" data-k="user">USER</span>
+      <span class="pnum" data-k="cpu">CPU%</span>
+      <span class="pnum" data-k="rss">MEM</span>
+      <span data-k="state">S</span>
+      <span data-k="cmd">COMMAND</span>
+    </div>
+    <div class="phead" id="net-head" style="display:none">
+      <span data-k="proto">PROTO</span>
+      <span data-k="lport">LOCAL</span>
+      <span data-k="rport">REMOTE</span>
+      <span data-k="state">STATE</span>
+      <span data-k="service">SERVICE</span>
+      <span data-k="pname">PID / PROCESS</span>
+    </div>
+    <div class="plist" id="ps-list"></div>
+    <div class="dpane" id="dpane" hidden>
+      <div class="dtools" id="dtools"></div>
+      <form class="dform" id="dform" autocomplete="off"></form>
+      <div class="dout" id="dout"><div class="dhint">pick a tool</div></div>
+      <div class="svcview" id="svcview" hidden>
+        <div class="svchead">
+          <button class="dtool" id="svc-back" type="button">← back</button>
+          <b id="svc-title">service</b>
+          <span class="spacer"></span>
+          <button class="dtool" id="svc-term" type="button">open in terminal</button>
+        </div>
+        <div class="svcbody" id="svc-body"></div>
+        <form class="svcline" id="svc-line" hidden autocomplete="off">
+          <input type="text" id="svc-input" placeholder="type a command, Enter to send" spellcheck="false">
+          <button type="submit">send</button>
+        </form>
+      </div>
+    </div>
+    <div class="pfoot">
+      <span id="ps-status"></span><span style="flex:1"></span>
+      <button class="pmini" data-needproc id="ps-term" title="SIGTERM">term</button>
+      <button class="pmini danger" data-needproc id="ps-kill" title="SIGKILL">kill -9</button>
+    </div>
+  </aside>
+
   <div class="scrim" id="scrim"></div>
   <aside class="drawer" id="drawer" aria-label="file browser">
     <div class="top">
@@ -283,6 +562,7 @@
       <button class="mini" id="f-sync"   title="Jump to the shell's current directory">sync</button>
       <button class="mini" id="f-hidden" title="Show hidden (dot) files">hidden</button>
       <button class="mini" id="f-new"    title="New folder">new folder</button>
+      <button class="mini" id="f-newfile" title="New file (opens the editor)">new file</button>
       <span style="flex:1"></span>
       <button class="mini" data-needsel id="f-dl"    title="Download (folders are zipped)">download</button>
       <button class="mini" data-needsel id="f-props" title="Properties (Alt+Enter)">properties</button>
@@ -299,6 +579,22 @@
 
   <div class="menu" id="f-menu"></div>
 
+  <div class="editwrap" id="f-edit">
+    <div class="editor">
+      <div class="ehead">
+        <b id="e-name">untitled</b>
+        <span class="dirty" id="e-dirty">●</span>
+        <span style="flex:1"></span>
+        <span class="meta" id="e-meta"></span>
+        <button class="mini" id="e-wrap" title="Toggle word wrap">wrap</button>
+        <button class="mini prim" id="e-save" title="Save (Ctrl+S)">save</button>
+        <button class="mini" id="e-close" title="Close (Esc)">✕</button>
+      </div>
+      <div id="e-area"></div>
+      <div class="efoot"><span id="e-status"></span><span style="flex:1"></span><span id="e-pos"></span></div>
+    </div>
+  </div>
+
   <div class="modalwrap" id="f-modal">
     <div class="modal">
       <div class="mhead"><b id="p-title">Properties</b><button class="mini" id="p-x">✕</button></div>
@@ -314,6 +610,8 @@
   <script src="/static/vendor/xterm.js"></script>
   <script src="/static/vendor/addon-fit.js"></script>
   <script src="/static/vendor/addon-weblinks.js"></script>
+  <script src="/static/vendor/ace/ace.js"></script>
+  <script src="/static/vendor/ace/ext-searchbox.js"></script>
   <script>
   (function () {
     const dark = !window.matchMedia("(prefers-color-scheme: light)").matches;
@@ -490,11 +788,14 @@
       if (e.type !== "keydown") return true;
       const k = e.key.toLowerCase();
       // xterm stopPropagation()s keys it handles, so Esc must be caught here too
+      if (e.key === "Escape" && EDWRAP.classList.contains("show")) { closeEditor(); return false; }
+      if (e.key === "Escape" && PS.open) { closePs(); return false; }
       if (e.key === "Escape" && drawer.open) { closeFiles(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "c") { copySelection(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "v") { fromClipboard(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "a") { setSelMode(true); selectAllPane(); return false; }
       if (e.ctrlKey && e.shiftKey && k === "f") { toggleFiles(); return false; }
+      if (e.ctrlKey && e.shiftKey && k === "p") { togglePs(); return false; }
       if (e.ctrlKey && e.key === "Insert") { copySelection(); return false; }
       if (e.shiftKey && e.key === "Insert") { fromClipboard(); return false; }
       // Ctrl-C with an active selection copies; with none it still interrupts
@@ -516,6 +817,8 @@
       { l: "tab",  d: "\t",     t: "Tab — complete", wide: true },
       { l: "ctrl", mod: "ctrl", t: "Ctrl (sticky — tap, then a key)", wide: true },
       { l: "alt",  mod: "alt",  t: "Alt / Meta (sticky)", wide: true },
+      { sep: true },
+      { l: "⬆ ..", act: "cdup", t: "Parent folder (cd ..)", wide: true },
       { sep: true },
       { l: "sel",  act: "sel",  t: "Select mode — selectable text for touch copy", wide: true },
       { l: "copy", act: "copy", t: "Copy selection (Ctrl+Shift+C)", wide: true },
@@ -543,7 +846,157 @@
       { l: "↵", d: "\r", t: "Enter" },
     ];
 
+    /* ---- directory history: back / up / forward, driven by the shell's real cwd ---- */
+    const NAV = { hist: [], i: -1, want: null, wantAt: 0, wantSent: 0 };
+    const navBack = document.getElementById("nav-back");
+    const navFwd  = document.getElementById("nav-fwd");
+    const navUp   = document.getElementById("nav-up");
+    const short = p => p === "/" ? "/" : p.replace(/^.*\//, "") || p;
+
+    function navPaint() {
+      const h = NAV.hist, i = NAV.i;
+      navBack.disabled = i <= 0;
+      navFwd.disabled  = i < 0 || i >= h.length - 1;
+      navBack.title = navBack.disabled ? "Back" : "Back to " + h[i - 1];
+      navFwd.title  = navFwd.disabled  ? "Forward" : "Forward to " + h[i + 1];
+      navUp.title = (i >= 0 && h[i] !== "/") ? "Up to " + (h[i].replace(/\/[^/]+$/, "") || "/")
+                                             : "Parent folder (cd ..)";
+      navUp.disabled = i >= 0 && h[i] === "/";
+    }
+
+    function navSaw(cwd) {                     // the shell reported where it is
+      if (!cwd) return;
+      if (NAV.want) {                          // we asked for this move
+        if (cwd === NAV.want) { NAV.i = NAV.wantAt; NAV.want = null; navPaint(); return; }
+        if (Date.now() - NAV.wantSent < 2500) return;   // still in flight
+        NAV.want = null;                       // cd failed or user typed something else
+      }
+      if (NAV.hist[NAV.i] === cwd) return;     // nothing moved
+      NAV.hist = NAV.hist.slice(0, NAV.i + 1); // a manual cd drops the forward trail
+      NAV.hist.push(cwd);
+      if (NAV.hist.length > 100) NAV.hist.shift();
+      NAV.i = NAV.hist.length - 1;
+      navPaint();
+    }
+
+    function navGo(idx) {
+      const target = NAV.hist[idx];
+      if (target === undefined) return;
+      NAV.want = target; NAV.wantAt = idx; NAV.wantSent = Date.now();
+      send({ t: "i", d: "\x15cd " + q(target) + "\n" });
+      term.focus(); flash(short(target));
+    }
+
+    navBack.onclick = () => navGo(NAV.i - 1);
+    navFwd.onclick  = () => navGo(NAV.i + 1);
+    navUp.onclick   = () => { send({ t: "i", d: "\x15cd ..\n" }); term.focus(); flash("cd .."); };
+
+    /* ---- user switcher ---- */
+    const UW = { users: [], me: "", cur: "", open: false, stack: [] };
+    const uBtn = document.getElementById("nav-user");
+    const uName = document.getElementById("nav-user-name");
+    const uMenu = document.getElementById("umenu");
+
+    function switchTo(name) {
+      closeUsers();
+      if (name === UW.cur) return;
+      // leaving a shell we pushed ourselves: exit back out instead of nesting again
+      if (UW.stack.length && UW.stack[UW.stack.length - 1].from === name) {
+        UW.stack.pop();
+        send({ t: "i", d: "\x15exit\n" });
+      } else {
+        UW.stack.push({ from: UW.cur, to: name });
+        const cmd = UW.cur === "root"
+          ? "su - " + q(name)                 // already root: no password needed
+          : "sudo -i -u " + q(name);          // may prompt for a password in the terminal
+        send({ t: "i", d: "\x15" + cmd + "\n" });
+      }
+      term.focus(); flash(name);
+    }
+
+    function renderUsers() {
+      uMenu.innerHTML = "";
+      const groups = [["root", "ROOT"], ["login", "USERS"], ["system", "SYSTEM"]];
+      for (const [kind, label] of groups) {
+        const list = UW.users.filter(u => u.kind === kind);
+        if (!list.length) continue;
+        if (kind === "system" && !UW.showSys) {
+          const b = document.createElement("button");
+          b.textContent = `show ${list.length} system accounts`;
+          b.style.color = "var(--dim)";
+          b.onclick = (e) => { e.stopPropagation(); UW.showSys = true; renderUsers(); };
+          uMenu.appendChild(document.createElement("hr"));
+          uMenu.appendChild(b);
+          continue;
+        }
+        const h = document.createElement("div");
+        h.className = "ug"; h.textContent = label;
+        uMenu.appendChild(h);
+        for (const u of list) {
+          const b = document.createElement("button");
+          b.className = u.name === UW.cur ? "cur" : "";
+          b.title = `${u.name} · uid ${u.uid} · ${u.shell}` +
+                    (u.login ? "" : " (no login shell — switching will fail)");
+          const n = document.createElement("span"); n.textContent = u.name;
+          const i = document.createElement("span"); i.className = "uid"; i.textContent = "uid " + u.uid;
+          b.append(n, i);
+          b.onclick = () => switchTo(u.name);
+          uMenu.appendChild(b);
+        }
+      }
+      if (UW.stack.length) {
+        uMenu.appendChild(document.createElement("hr"));
+        const b = document.createElement("button");
+        b.textContent = "exit back to " + UW.stack[UW.stack.length - 1].from;
+        b.onclick = () => { UW.stack.pop(); closeUsers();
+                            send({ t: "i", d: "\x15exit\n" }); term.focus(); };
+        uMenu.appendChild(b);
+      }
+    }
+
+    function openUsers() {
+      if (!UW.users.length) loadUsers();
+      UW.open = true; uMenu.hidden = false; uBtn.classList.add("on"); renderUsers();
+    }
+    function closeUsers() {
+      UW.open = false; uMenu.hidden = true; uBtn.classList.remove("on");
+    }
+    uBtn.onclick = (e) => { e.stopPropagation(); UW.open ? closeUsers() : openUsers(); };
+    document.addEventListener("click", (e) => {
+      if (UW.open && !uMenu.contains(e.target) && !uBtn.contains(e.target)) closeUsers();
+    });
+
+    function setUser(name) {
+      if (!name || name === UW.cur) return;
+      UW.cur = name;
+      uName.textContent = name;
+      uBtn.classList.toggle("root", name === "root");
+      uBtn.title = "Current user: " + name + " — click to switch";
+      if (UW.open) renderUsers();
+    }
+
+    async function loadUsers() {
+      try {
+        const d = await (await fetch(api("/api/users", {}))).json();
+        UW.users = d.users; UW.me = d.server_user; UW.sudo = d.sudo;
+        if (!UW.cur) setUser(d.server_user);
+        if (UW.open) renderUsers();
+      } catch (e) { /* the cwd poll will set the name anyway */ }
+    }
+    setTimeout(loadUsers, 0);        // after the rest of the script has initialised
+
+    async function navPoll() {
+      if (!sid) return;
+      try {
+        const d = await (await fetch(api("/api/cwd", { sid }))).json();
+        if (d.alive) { navSaw(d.cwd); setUser(d.user); }
+      } catch (e) { /* offline; try again next tick */ }
+    }
+    setInterval(navPoll, 1200);
+
     const ACTIONS = {
+      // \x15 kills a half-typed line so "cd .." can't concatenate onto it
+      cdup: () => { send({ t: "i", d: "\x15cd ..\n" }); term.focus(); flash("cd .."); },
       sel: toggleSel,
       copy: () => copySelection(),
       paste: fromClipboard,
@@ -757,8 +1210,9 @@
     }
     function openEntry(it) {
       if (it.dir) loadDir(it.full);
-      else { send({ t: "i", d: q(it.full) }); term.focus(); flash("path inserted"); }
+      else openEditor(it.full, it.name);      // double-click a file -> notepad
     }
+    function insertPath(it) { send({ t: "i", d: q(it.full) }); term.focus(); flash("path inserted"); }
 
     /* actions */
     function download(it) {
@@ -788,13 +1242,24 @@
     async function doDelete(it) {
       if (!confirm(`Delete ${it.dir ? "folder" : "file"}  ${it.name}  permanently?${it.dir ? "\n\nEverything inside it goes too." : ""}`)) return;
       try { await post("/api/delete", { path: it.full }); flash("deleted"); loadDir(FB.path, false); }
-      catch (e) { flash(String(e.message)); }
+      catch (e) { permFallback(e, "sudo rm -rf " + q(it.full)); }
     }
     async function newFolder() {
       const name = prompt("New folder name:", "New folder");
       if (!name) return;
       try { await post("/api/mkdir", { path: FB.path, name }); flash("created"); loadDir(FB.path, false); }
-      catch (e) { flash(String(e.message)); }
+      catch (e) { permFallback(e, "sudo mkdir " + q(join(FB.path, name))); }
+    }
+
+    // Shared: report the error, and offer to run the sudo equivalent in the terminal.
+    function permFallback(e, cmd) {
+      const msg = String(e.message);
+      flash(msg);
+      if (!/permitted|denied|sudo/i.test(msg)) return;
+      if (!confirm(msg + "\n\nRun this in the terminal instead?\n\n" + cmd)) return;
+      send({ t: "i", d: "\x15" + cmd + "\n" });
+      closeFiles();
+      flash("sent to terminal — type your password if asked");
     }
 
     /* context menu */
@@ -804,7 +1269,7 @@
            ["Download as .zip", () => download(it)], null,
            ["Rename…", () => doRename(it)], [it.name.startsWith(".") ? "Unhide" : "Hide", () => toggleHidden(it)],
            ["Delete", () => doDelete(it), true], null, ["Properties", () => properties(it)]]
-        : [["Insert path", () => openEntry(it)], ["View with less", () => { send({ t: "i", d: "\x15less -R " + q(it.full) + "\n" }); closeFiles(); }], null,
+        : [["Edit", () => openEditor(it.full, it.name)], ["Insert path", () => insertPath(it)], ["View with less", () => { send({ t: "i", d: "\x15less -R " + q(it.full) + "\n" }); closeFiles(); }], null,
            ["Download", () => download(it)], null,
            ["Rename…", () => doRename(it)], [it.name.startsWith(".") ? "Unhide" : "Hide", () => toggleHidden(it)],
            ["Delete", () => doDelete(it), true], null, ["Properties", () => properties(it)]];
@@ -898,12 +1363,151 @@
         if (mode && parseInt(mode, 8) !== d.mode) await post("/api/chmod", { path: d.path, mode });
         if (name && name !== d.name) await post("/api/rename", { path: d.path, name });
         modal.classList.remove("show"); flash("properties applied"); loadDir(FB.path, false);
-      } catch (e) { err.textContent = String(e.message); }
+      } catch (e) {
+        const msg = String(e.message);
+        err.textContent = msg;
+        // permission denied: the HTTP API runs as the server's user, but the terminal
+        // can sudo (and can prompt for a password), so offer that route
+        const cmds = [];
+        if (mode && parseInt(mode, 8) !== d.mode) cmds.push("sudo chmod " + mode + " " + q(d.path));
+        if (name && name !== d.name) cmds.push("sudo mv -T " + q(d.path) + " " + q(d.path.replace(/[^/]+$/, "") + name));
+        if (cmds.length) {
+          err.textContent = msg + " ";
+          const a = document.createElement("button");
+          a.className = "mini"; a.textContent = "run in terminal";
+          a.title = cmds.join(" && ");
+          a.onclick = () => {
+            send({ t: "i", d: "\x15" + cmds.join(" && ") + "\n" });
+            modal.classList.remove("show"); closeFiles();
+            flash("sent to terminal — type your password if asked");
+          };
+          err.appendChild(a);
+        }
+      }
     }
     document.getElementById("p-apply").onclick = applyProps;
     document.getElementById("p-cancel").onclick = () => modal.classList.remove("show");
     document.getElementById("p-x").onclick = () => modal.classList.remove("show");
     modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("show"); });
+
+    /* ---------- notepad (Ace) ---------- */
+    const EDWRAP = document.getElementById("f-edit");
+    const ED = { ace: null, path: null, mtime: 0, crlf: false, encoding: "utf-8", dirty: false, ro: false };
+
+    const MODES = {
+      js:"javascript", mjs:"javascript", cjs:"javascript", jsx:"javascript", ts:"typescript", tsx:"typescript",
+      py:"python", rb:"ruby", go:"golang", rs:"rust", java:"java", php:"php",
+      c:"c_cpp", h:"c_cpp", cpp:"c_cpp", cc:"c_cpp", hpp:"c_cpp",
+      sh:"sh", bash:"sh", zsh:"sh", fish:"sh", env:"sh",
+      json:"json", yml:"yaml", yaml:"yaml", toml:"ini", ini:"ini", cfg:"ini", conf:"ini",
+      md:"markdown", markdown:"markdown", html:"html", htm:"html", xml:"xml", svg:"xml",
+      css:"css", scss:"css", sql:"sql", dockerfile:"dockerfile",
+    };
+    function modeFor(name) {
+      const low = name.toLowerCase();
+      if (low === "dockerfile") return "dockerfile";
+      if (low === "makefile") return "sh";
+      if (low.startsWith(".bash") || low.startsWith(".profile") || low.startsWith(".zsh")) return "sh";
+      if (low.startsWith(".git")) return "ini";
+      const ext = low.includes(".") ? low.split(".").pop() : "";
+      return MODES[ext] || "text";
+    }
+
+    function ensureAce() {
+      if (ED.ace) return ED.ace;
+      ace.config.set("basePath", "/static/vendor/ace");
+      const e = ace.edit("e-area");
+      e.setTheme(dark ? "ace/theme/one_dark" : "ace/theme/textmate");
+      e.setOptions({
+        fontSize: "13px", showPrintMargin: false, useSoftTabs: true, tabSize: 2,
+        wrap: false, scrollPastEnd: 0.3, highlightActiveLine: true, newLineMode: "unix",
+      });
+      e.on("change", () => { if (!ED.dirty) { ED.dirty = true; document.getElementById("e-dirty").classList.add("on"); } });
+      e.selection.on("changeCursor", () => {
+        const c = e.getCursorPosition();
+        document.getElementById("e-pos").textContent = `Ln ${c.row + 1}, Col ${c.column + 1}`;
+      });
+      e.commands.addCommand({
+        name: "save", bindKey: { win: "Ctrl-S", mac: "Command-S" }, exec: saveFile,
+      });
+      ED.ace = e;
+      return e;
+    }
+
+    async function openEditor(full, name) {
+      let d;
+      try {
+        const r = await fetch(api("/api/read", { path: full }));
+        if (!r.ok) {
+          const msg = (await r.json().catch(() => ({}))).detail || r.statusText;
+          if (r.status === 415) return flash("binary file — use download");
+          return flash(String(msg));
+        }
+        d = await r.json();
+      } catch (e) { return flash("read failed"); }
+
+      const e = ensureAce();
+      ED.path = d.path; ED.mtime = d.mtime; ED.crlf = d.crlf; ED.encoding = d.encoding; ED.ro = d.readonly;
+      e.session.setMode("ace/mode/" + modeFor(d.name));
+      e.setValue(d.text, -1);
+      e.setReadOnly(d.readonly);
+      e.session.getUndoManager().reset();
+      ED.dirty = false;
+      document.getElementById("e-dirty").classList.remove("on");
+      document.getElementById("e-name").textContent = d.name;
+      document.getElementById("e-name").title = d.path;
+      document.getElementById("e-meta").textContent =
+        `${d.encoding}${d.crlf ? " · CRLF" : " · LF"} · ${human(d.size)}${d.readonly ? " · read-only" : ""}`;
+      document.getElementById("e-save").disabled = d.readonly;
+      document.getElementById("e-status").textContent = d.readonly ? "read-only (no write permission)" : "";
+      EDWRAP.classList.add("show");
+      setTimeout(() => e.focus(), 50);
+    }
+
+    async function saveFile(force) {
+      if (!ED.path || ED.ro) return;
+      const e = ED.ace, st = document.getElementById("e-status");
+      try {
+        const r = await post("/api/write", {
+          path: ED.path, text: e.getValue(), mtime: ED.mtime,
+          crlf: ED.crlf, encoding: ED.encoding, force: force === true,
+        });
+        ED.mtime = r.mtime; ED.dirty = false;
+        document.getElementById("e-dirty").classList.remove("on");
+        st.textContent = "saved " + new Date().toLocaleTimeString();
+        flash("saved " + ED.path.split("/").pop());
+        if (FB.open) loadDir(FB.path, false);
+      } catch (err) {
+        const msg = String(err.message);
+        if (msg.includes("changed on disk")) {
+          if (confirm("File changed on disk since you opened it.\n\nOverwrite those changes?")) return saveFile(true);
+          st.textContent = "not saved — file changed on disk";
+        } else { st.textContent = "save failed: " + msg; flash("save failed"); }
+      }
+    }
+
+    function closeEditor() {
+      if (ED.dirty && !confirm("Unsaved changes will be lost. Close anyway?")) return;
+      EDWRAP.classList.remove("show");
+      ED.dirty = false; ED.path = null;
+      if (FB.open) fList.focus(); else term.focus();
+    }
+    document.getElementById("e-save").onclick = () => saveFile();
+    document.getElementById("e-close").onclick = closeEditor;
+    document.getElementById("e-wrap").onclick = (ev) => {
+      const on = !ED.ace.getOption("wrap");
+      ED.ace.setOption("wrap", on);
+      ev.currentTarget.classList.toggle("on", on);
+    };
+    EDWRAP.addEventListener("click", (ev) => { if (ev.target === EDWRAP) closeEditor(); });
+    async function newFile() {
+      const name = prompt("New file name:", "untitled.txt");
+      if (!name) return;
+      try {
+        const r = await post("/api/touch", { path: FB.path, name });
+        loadDir(FB.path, false); openEditor(r.path, name);
+      } catch (e) { flash(String(e.message)); }
+    }
 
     /* toolbar + drawer plumbing */
     function openFiles()  { FB.open = true;  document.body.classList.add("files"); loadDir(FB.path || ""); setTimeout(() => fList.focus(), 60); }
@@ -912,7 +1516,7 @@
     const drawer = FB;                       // alias used by the Esc handler
 
     document.getElementById("fab").onclick = toggleFiles;
-    document.getElementById("scrim").onclick = closeFiles;
+    document.getElementById("scrim").onclick = () => { if (PS.open) closePs(); else closeFiles(); };
     document.getElementById("f-close").onclick = closeFiles;
     document.getElementById("f-reload").onclick = () => loadDir(FB.path, false);
     document.getElementById("f-sync").onclick = () => loadDir("");          // "" = follow the shell
@@ -920,6 +1524,7 @@
     document.getElementById("f-back").onclick = () => { if (FB.hi > 0) loadDir(FB.hist[--FB.hi], false); };
     document.getElementById("f-fwd").onclick = () => { if (FB.hi < FB.hist.length - 1) loadDir(FB.hist[++FB.hi], false); };
     document.getElementById("f-new").onclick = newFolder;
+    document.getElementById("f-newfile").onclick = newFile;
     document.getElementById("f-dl").onclick = () => FB.sel && download(FB.sel);
     document.getElementById("f-props").onclick = () => FB.sel && properties(FB.sel);
     document.getElementById("f-hidden").onclick = (e) => {
@@ -937,7 +1542,7 @@
 
     // Explorer-ish keyboard handling while the drawer has focus
     document.getElementById("drawer").addEventListener("keydown", (e) => {
-      if (modal.classList.contains("show")) return;
+      if (modal.classList.contains("show") || EDWRAP.classList.contains("show")) return;
       const rows = sorted();
       const i = FB.sel ? rows.findIndex(r => r.name === FB.sel.name) : -1;
       const pick = (n) => {
@@ -958,10 +1563,819 @@
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (modal.classList.contains("show")) { modal.classList.remove("show"); e.preventDefault(); }
+        if (EDWRAP.classList.contains("show")) { closeEditor(); e.preventDefault(); }
+        else if (modal.classList.contains("show")) { modal.classList.remove("show"); e.preventDefault(); }
         else if (fMenu.classList.contains("show")) { hideMenu(); e.preventDefault(); }
+        else if (PS.open) { closePs(); e.preventDefault(); }
         else if (FB.open) { closeFiles(); e.preventDefault(); }
       }
+    });
+
+    /* ---------- process viewer ---------- */
+    const PS = { open:false, tab:"ps", rows:[], conns:[], sel:null, sort:"cpu", desc:true,
+                 nsort:"lport", ndesc:false, timer:null, auto:false, filter:"" };
+    const psList = document.getElementById("ps-list");
+    const psStatus = document.getElementById("ps-status");
+
+    // the panel borrows the Ace theme, so it follows the same light/dark decision
+    if (!dark) document.body.classList.add("light-ace");
+
+    const secs = (s) => {
+      s = Math.max(0, Math.round(s));
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      return h ? `${h}h${String(m).padStart(2, "0")}` : (m ? `${m}m${String(s % 60).padStart(2, "0")}s` : s + "s");
+    };
+
+    async function loadNet() {
+      let d;
+      try { d = await (await fetch(api("/api/net", {}))).json(); }
+      catch (e) { psStatus.textContent = "request failed"; return; }
+      PS.conns = d.conns; PS.netinfo = d;
+      renderNet();
+    }
+
+    function netSorted() {
+      const k = PS.nsort, dir = PS.ndesc ? -1 : 1;
+      const f = PS.filter.trim().toLowerCase();
+      let rows = PS.conns || [];
+      if (f) rows = rows.filter(c =>
+        c.proto.includes(f) || c.state.toLowerCase().includes(f) ||
+        (c.service || "").includes(f) || (c.pname || "").toLowerCase().includes(f) ||
+        String(c.pid) === f || c.local.includes(f) || c.remote.includes(f) ||
+        String(c.lport) === f || String(c.rport) === f);
+      return rows.slice().sort((a, b) => {
+        const v = (k === "lport" || k === "rport" || k === "pid")
+          ? a[k] - b[k] : String(a[k]).localeCompare(String(b[k]));
+        return v * dir;
+      });
+    }
+
+    function renderNet() {
+      const rows = netSorted();
+      const keep = PS.sel && PS.sel.pid;
+      const top = psList.scrollTop;
+      psList.innerHTML = "";
+      document.querySelectorAll("#net-head span").forEach(h =>
+        h.classList.toggle("active", h.dataset.k === PS.nsort));
+
+      for (const c of rows) {
+        const row = document.createElement("div");
+        row.className = "prow" + (c.pid && c.pid === keep ? " sel" : "");
+        const rem = c.rport ? `${c.remote}:${c.rport}` : "*:*";
+        row.innerHTML =
+          `<span>${c.proto}</span>` +
+          `<span class="${c.listen ? "nlisten" : ""}">${c.local}:${c.lport}</span>` +
+          `<span>${rem}</span><span class="nstate">${c.state}</span>` +
+          `<span>${c.service || ""}</span><span class="npname"></span>`;
+        row.querySelector(".npname").textContent = c.pid ? `${c.pid} ${c.pname}` : "—";
+        row.title = `${c.proto} ${c.local}:${c.lport} -> ${rem}\n${c.state} · user ${c.user}` +
+                    (c.pid ? ` · pid ${c.pid} (${c.pname})` : " · owning pid not visible");
+        row.onclick = () => {
+          PS.sel = c.pid ? { pid: c.pid, name: c.pname } : null;
+          renderNet();
+        };
+        psList.appendChild(row);
+      }
+      psList.scrollTop = top;
+      const listening = (PS.conns || []).filter(c => c.listen).length;
+      psStatus.textContent =
+        `${rows.length}${rows.length !== (PS.conns || []).length ? "/" + PS.conns.length : ""} sockets · ` +
+        `${listening} listening` +
+        (PS.netinfo && !PS.netinfo.root && !PS.netinfo.sudo ? " · pids limited (not root)" : "") +
+        (PS.sel ? `  —  selected pid ${PS.sel.pid}` : "");
+      document.querySelectorAll("[data-needproc]").forEach(b => { b.disabled = !PS.sel; });
+    }
+
+
+
+    /* ---------------------- per-service connect views ---------------------- */
+    const SVC = { host: "", port: 0, kind: "", ws: null, path: "/", user: "", pass: "" };
+    const svcView = document.getElementById("svcview");
+    const svcBody = document.getElementById("svc-body");
+    const svcTitle = document.getElementById("svc-title");
+    const svcLine = document.getElementById("svc-line");
+    const svcInput = document.getElementById("svc-input");
+    const svcTermBtn = document.getElementById("svc-term");
+
+    const SVC_FOR = {
+      21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 465: "smtp", 587: "smtp",
+      2525: "smtp", 111: "nfs", 2049: "nfs", 80: "http", 8080: "http", 8000: "http",
+      8008: "http", 8888: "http", 3000: "http", 5000: "http", 9090: "http",
+      4200: "http", 5173: "http", 8081: "http", 8090: "http", 7681: "http",
+      443: "https", 8443: "https", 9443: "https",
+    };
+    const svcKind = (port, name) => SVC_FOR[port] ||
+      ({ http: "http", "http-alt": "http", "http-proxy": "http", https: "https",
+         ftp: "ftp", ssh: "ssh", telnet: "telnet", smtp: "smtp", submission: "smtp",
+         nfs: "nfs", sunrpc: "nfs", rpcbind: "nfs" })[name] || "raw";
+    const SVC_LABEL = { http: "open", https: "open", ftp: "ftp", ssh: "ssh",
+                        telnet: "telnet", smtp: "smtp", nfs: "nfs", raw: "connect" };
+
+    async function svcPost(ep, body) {
+      if (DISC.confirmed) body.confirm = 1;
+      let r = await fetch(api(ep, {}), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ token }, body)),
+      });
+      if (r.status === 428) {
+        const msg = (await r.json()).detail || "public target";
+        if (!confirm(msg + ".\n\nConnecting to machines you do not own may be illegal. Continue?"))
+          return null;
+        DISC.confirmed = true; body.confirm = 1;
+        r = await fetch(api(ep, {}), {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ token }, body)),
+        });
+      }
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || r.status);
+      return d;
+    }
+
+    function openSvc(host, port, kind) {
+      SVC.host = host; SVC.port = port; SVC.kind = kind;
+      SVC.path = "/"; SVC.user = "anonymous"; SVC.pass = "anonymous@";
+      if (kind === "http" || kind === "https") {
+        window.open(`${kind}://${host}:${port}/`, "_blank", "noopener");
+        return;
+      }
+      svcTitle.textContent = `${kind} · ${host}:${port}`;
+      svcBody.innerHTML = '<div class="dhint">connecting…</div>';
+      svcLine.hidden = kind !== "telnet" && kind !== "raw" && kind !== "smtp";
+      svcView.hidden = false;
+      svcTermBtn.hidden = false;
+      ({ ftp: svcFtp, ssh: svcSsh, smtp: svcSmtp, nfs: svcNfs,
+         telnet: svcRaw, raw: svcRaw }[kind] || svcRaw)();
+    }
+
+    function closeSvc() {
+      if (SVC.ws) { try { SVC.ws.close(); } catch (e) {} SVC.ws = null; }
+      svcView.hidden = true;
+      svcBody.innerHTML = "";
+    }
+    document.getElementById("svc-back").onclick = closeSvc;
+
+    // "open in terminal" hands the session to the real shell, which has real clients
+    svcTermBtn.onclick = () => {
+      const h = q(SVC.host), p = SVC.port;
+      const cmd = {
+        ssh: `ssh -p ${p} ${SVC.host}`,
+        ftp: `ftp ${SVC.host} ${p}`,
+        telnet: `telnet ${SVC.host} ${p}`,
+        smtp: `nc ${SVC.host} ${p}`,
+        raw: `nc ${SVC.host} ${p}`,
+        nfs: `sudo mount -t nfs ${SVC.host}:${SVC.nfsPath || "/export"} /mnt`,
+      }[SVC.kind] || `nc ${SVC.host} ${p}`;
+      send({ t: "i", d: "\x15" + cmd + "\n" });
+      closePs(); term.focus(); flash(cmd.split(" ")[0]);
+    };
+
+    /* ---- FTP: a tiny file browser over the control connection ---- */
+    async function svcFtp(path) {
+      svcBody.innerHTML = '<div class="dhint">listing…</div>';
+      let d;
+      try {
+        d = await svcPost("/api/svc/ftp", { host: SVC.host, port: SVC.port,
+          user: SVC.user, password: SVC.pass, path: path === undefined ? SVC.path : path });
+      } catch (e) { svcBody.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+      if (!d) { closeSvc(); return; }
+      if (d.error) {
+        svcBody.innerHTML =
+          `<div class="bad">${esc(d.error)}</div>` +
+          `<h4>CREDENTIALS</h4><div class="dform" style="padding:0;border:0">
+             <input type="text" id="ftp-u" placeholder="user" value="${esc(SVC.user)}">
+             <input type="text" id="ftp-p" placeholder="password" value="${esc(SVC.pass)}">
+             <button type="button" id="ftp-login">log in</button></div>`;
+        document.getElementById("ftp-login").onclick = () => {
+          SVC.user = document.getElementById("ftp-u").value;
+          SVC.pass = document.getElementById("ftp-p").value;
+          svcFtp(SVC.path);
+        };
+        return;
+      }
+      SVC.path = d.path;
+      const up = d.path.replace(/\/[^/]*\/?$/, "") || "/";
+      let h = `<div class="dhint">${esc(d.welcome)}</div>`;
+      h += `<h4>${esc(d.path)}</h4>`;
+      h += `<table><tr><th>name</th><th>size</th><th>modified</th><th></th></tr>`;
+      if (d.path !== "/") h += `<tr><td class="fitem" data-dir="${esc(up)}">../</td><td></td><td></td><td></td></tr>`;
+      // MLSD hands back 20261015093801 — make it readable
+      const mtime = (v) => /^\d{14}$/.test(v || "")
+        ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)} ${v.slice(8, 10)}:${v.slice(10, 12)}`
+        : (v || "");
+      for (const e of d.entries) {
+        h += `<tr><td class="${e.dir ? "fitem" : ""}" ${e.dir ? `data-dir="${esc((d.path === "/" ? "" : d.path) + "/" + e.name)}"` : ""}>` +
+             `${e.dir ? "📁 " : ""}${esc(e.name)}</td>` +
+             `<td>${e.dir ? "" : bytes(e.size)}</td><td>${esc(mtime(e.modify))}</td>` +
+             `<td>${e.dir ? "" : `<button class="pact" data-get="${esc(e.name)}">get</button>`}</td></tr>`;
+      }
+      h += `</table>`;
+      if (d.features.length) h += `<h4>FEATURES</h4><pre>${esc(d.features.join(" · "))}</pre>`;
+      svcBody.innerHTML = h;
+      svcBody.querySelectorAll("[data-dir]").forEach(el => {
+        el.onclick = () => svcFtp(el.dataset.dir);
+      });
+      svcBody.querySelectorAll("[data-get]").forEach(el => {
+        el.onclick = () => {
+          const full = (SVC.path === "/" ? "" : SVC.path) + "/" + el.dataset.get;
+          window.open(api("/api/svc/ftp/get", { host: SVC.host, port: SVC.port,
+            user: SVC.user, password: SVC.pass, path: full, confirm: DISC.confirmed ? 1 : 0 }), "_blank");
+        };
+      });
+    }
+
+    /* ---- SSH: host key and what the server will accept ---- */
+    async function svcSsh() {
+      let d;
+      try { d = await svcPost("/api/svc/ssh", { host: SVC.host, port: SVC.port }); }
+      catch (e) { svcBody.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+      if (!d) { closeSvc(); return; }
+      let h = table(["banner", "host key", "fingerprint"], [[
+        `<span class="ok">${esc(d.banner || "—")}</span>`,
+        esc((d.key_type || "") + (d.key_bits ? ` ${d.key_bits} bit` : "")),
+        `<span style="word-break:break-all">${esc(d.fingerprint_sha256 || "")}</span>`]]);
+      if (d.error) h += `<div class="bad">${esc(d.error)}</div>`;
+      if (d.note) h += `<div class="dhint">${esc(d.note)}</div>`;
+      if (d.auth) h += `<h4>ACCEPTED AUTH</h4><pre>${esc(d.auth.join(", "))}</pre>`;
+      if (d.fingerprint_md5) h += `<h4>MD5</h4><pre>${esc(d.fingerprint_md5)}</pre>`;
+      for (const [k, label] of [["kex", "KEY EXCHANGE"], ["hostkey", "HOST KEY ALGORITHMS"],
+                                ["cipher", "CIPHERS"], ["mac", "MACS"]]) {
+        if ((d[k] || []).length) h += `<h4>${label}</h4><pre>${esc(d[k].join(", "))}</pre>`;
+      }
+      svcBody.innerHTML = h;
+    }
+
+    /* ---- SMTP: capabilities, STARTTLS, certificate ---- */
+    async function svcSmtp() {
+      let d;
+      try { d = await svcPost("/api/svc/smtp", { host: SVC.host, port: SVC.port }); }
+      catch (e) { svcBody.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+      if (!d) { closeSvc(); return; }
+      let h = table(["greeting", "ESMTP", "STARTTLS", "size limit"], [[
+        `<span class="ok">${esc(d.banner || "")}</span>`,
+        d.esmtp ? "yes" : "no",
+        d.starttls ? '<span class="ok">yes</span>' : '<span class="bad">no</span>',
+        d.size_limit ? bytes(d.size_limit) : "—"]]);
+      if (d.error) h += `<div class="bad">${esc(d.error)}</div>`;
+      if ((d.features || []).length) h += `<h4>CAPABILITIES</h4><pre>${esc(d.features.join(" · "))}</pre>`;
+      if ((d.auth || []).length) h += `<h4>AUTH MECHANISMS</h4><pre>${esc(d.auth.join(", "))}</pre>`;
+      const c = d.cert;
+      if (c && !c.error && c.subject) {
+        h += `<h4>CERTIFICATE</h4>` + table(["subject", "expires"],
+          [[esc(c.subject), `<span class="${c.expired ? "bad" : "ok"}">${esc(c.not_after)} (${c.days_left}d)</span>`]]);
+      }
+      h += `<h4>LIVE SESSION</h4><pre class="console" id="svc-console"></pre>`;
+      svcBody.innerHTML = h;
+      rawConnect(document.getElementById("svc-console"));
+    }
+
+    /* ---- NFS: portmap dump + export list ---- */
+    async function svcNfs() {
+      let d;
+      try { d = await svcPost("/api/svc/nfs", { host: SVC.host, port: SVC.port === 2049 ? 111 : SVC.port }); }
+      catch (e) { svcBody.innerHTML = `<div class="bad">${esc(e.message)}</div>`; return; }
+      if (!d) { closeSvc(); return; }
+      let h = "";
+      if (d.error) h += `<div class="bad">${esc(d.error)}</div>`;
+      if ((d.exports || []).length) {
+        SVC.nfsPath = d.exports[0].path;
+        h += `<h4>EXPORTS (${esc(d.source)})</h4>` + table(["path", "allowed clients", ""],
+          d.exports.map(e => [`<span class="ok">${esc(e.path)}</span>`,
+            esc((e.clients || []).join(", ")),
+            `<button class="pact" data-mount="${esc(e.path)}">mount</button>`]));
+      }
+      if ((d.programs || []).length) {
+        h += `<h4>RPC PROGRAMS</h4>` + table(["program", "ver", "proto", "port"],
+          d.programs.map(p => [esc(p.name), p.version, esc(p.proto), p.port]));
+      }
+      svcBody.innerHTML = h || '<div class="dhint">nothing registered</div>';
+      svcBody.querySelectorAll("[data-mount]").forEach(el => {
+        el.onclick = () => {
+          const p = el.dataset.mount;
+          const mp = "/mnt/" + (p.split("/").filter(Boolean).pop() || "nfs");
+          send({ t: "i", d: `\x15sudo mkdir -p ${q(mp)} && sudo mount -t nfs ${q(SVC.host + ":" + p)} ${q(mp)}\n` });
+          closePs(); term.focus(); flash("mount " + p);
+        };
+      });
+    }
+
+    /* ---- telnet / anything else: a raw TCP console ---- */
+    function svcRaw() {
+      svcBody.innerHTML = '<pre class="console" id="svc-console"></pre>';
+      rawConnect(document.getElementById("svc-console"));
+    }
+
+    function rawConnect(pre) {
+      if (SVC.ws) { try { SVC.ws.close(); } catch (e) {} }
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const qs = new URLSearchParams({ host: SVC.host, port: SVC.port,
+                                       confirm: DISC.confirmed ? 1 : 0 });
+      if (token) qs.set("token", token);
+      const ws = new WebSocket(`${proto}://${location.host}/ws/raw?${qs}`);
+      SVC.ws = ws;
+      ws.onmessage = (ev) => {
+        pre.textContent += ev.data;
+        pre.scrollIntoView({ block: "end" });
+        svcBody.scrollTop = svcBody.scrollHeight;
+      };
+      ws.onclose = (ev) => {
+        pre.textContent += ev.code === 4403
+          ? "\n[refused: public target not confirmed — run a tool on this host first]\n"
+          : "\n[disconnected]\n";
+      };
+      ws.onerror = () => { pre.textContent += "\n[connection error]\n"; };
+    }
+
+    svcLine.onsubmit = (e) => {
+      e.preventDefault();
+      if (SVC.ws && SVC.ws.readyState === 1) {
+        SVC.ws.send(svcInput.value + "\r\n");
+        svcInput.value = "";
+      }
+    };
+
+    /* ------------------------------ network discovery tab ------------------------------ */
+    const DISC = { tool: "self", busy: false, confirmed: false, bwTimer: null, bwPrev: {} };
+    const dPane = document.getElementById("dpane");
+    const dTools = document.getElementById("dtools");
+    const dForm = document.getElementById("dform");
+    const dOut = document.getElementById("dout");
+
+    const esc = (v) => String(v ?? "").replace(/[&<>"]/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const bytes = (n) => {
+      n = Number(n) || 0;
+      const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0;
+      while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+      return (i ? n.toFixed(1) : n) + " " + u[i];
+    };
+    const table = (cols, rows) =>
+      `<table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>` +
+      rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("") + "</table>";
+
+    const TOOLS = {
+      self:     { label: "my network", get: "/api/net/self", fields: [], auto: true },
+      public:   { label: "public IP",  get: "/api/net/public", fields: [], auto: true },
+      ping:     { label: "ping", post: "/api/net/ping", target: "host",
+                  fields: [["host", "text", "host or IP", "8.8.8.8"],
+                           ["count", "number", "count", "4", "narrow"]] },
+      trace:    { label: "traceroute", post: "/api/net/trace", target: "host",
+                  fields: [["host", "text", "host or IP", "google.com"],
+                           ["max_hops", "number", "hops", "20", "narrow"]] },
+      hosts:    { label: "find hosts", post: "/api/net/hosts", target: "cidr",
+                  fields: [["cidr", "text", "network, e.g. 192.168.1.0/24", ""]] },
+      ports:    { label: "scan ports", post: "/api/net/ports", target: "host",
+                  fields: [["host", "text", "host or IP", "127.0.0.1"],
+                           ["ports", "text", "ports: blank = top 53", ""]] },
+      dns:      { label: "DNS", post: "/api/net/dns",
+                  fields: [["name", "text", "name or IP", "google.com"],
+                           ["type", "select", "", "A", "", ["A", "AAAA", "MX", "TXT", "NS", "SOA", "CNAME", "SRV", "PTR"]],
+                           ["resolver", "text", "resolver (optional)", ""]] },
+      arp:      { label: "neighbours", get: "/api/net/arp", fields: [], auto: true },
+      banner:   { label: "banner / TLS", post: "/api/net/banner", target: "host",
+                  fields: [["host", "text", "host or IP", "github.com"],
+                           ["port", "number", "port", "443", "narrow"],
+                           ["tls", "check", "TLS", "1"]] },
+      http:     { label: "HTTP check", post: "/api/net/http", target: "url",
+                  fields: [["url", "text", "URL", "https://example.com"]] },
+      bw:       { label: "bandwidth", get: "/api/net/bw", fields: [], auto: true, live: true },
+      whois:    { label: "whois / ASN", post: "/api/net/whois",
+                  fields: [["target", "text", "domain or IP", "google.com"]] },
+      discover: { label: "devices", get: "/api/net/discover", fields: [], auto: true },
+    };
+
+    function buildTools() {
+      dTools.innerHTML = "";
+      for (const [k, t] of Object.entries(TOOLS)) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "dtool" + (k === DISC.tool ? " on" : "");
+        b.textContent = t.label; b.onclick = () => pickTool(k);
+        dTools.appendChild(b);
+      }
+    }
+
+    function pickTool(k) {
+      DISC.tool = k;
+      stopBw(); closeSvc();
+      buildTools();
+      const t = TOOLS[k];
+      dForm.innerHTML = "";
+      for (const [name, kind, ph, def, cls, opts] of t.fields) {
+        if (kind === "select") {
+          const sel = document.createElement("select");
+          sel.name = name;
+          for (const o of opts) {
+            const op = document.createElement("option");
+            op.value = o; op.textContent = o; if (o === def) op.selected = true;
+            sel.appendChild(op);
+          }
+          dForm.appendChild(sel);
+        } else if (kind === "check") {
+          const l = document.createElement("label");
+          const i = document.createElement("input");
+          i.type = "checkbox"; i.name = name; i.checked = def === "1";
+          l.append(i, document.createTextNode(ph));
+          dForm.appendChild(l);
+        } else {
+          const i = document.createElement("input");
+          i.type = kind === "number" ? "number" : "text";
+          i.name = name; i.placeholder = ph; i.value = def;
+          if (cls) i.className = cls;
+          dForm.appendChild(i);
+        }
+      }
+      if (t.fields.length) {
+        const go = document.createElement("button");
+        go.type = "submit"; go.textContent = "run";
+        dForm.appendChild(go);
+      } else {
+        const go = document.createElement("button");
+        go.type = "submit"; go.textContent = "refresh";
+        dForm.appendChild(go);
+      }
+      // the "find hosts" default comes from this machine's own subnet
+      if (k === "hosts" && DISC.lanGuess) dForm.elements.cidr.value = DISC.lanGuess;
+      if (t.fields.length) {
+        // never fire a probe just because a tool was selected — wait for "run"
+        dOut.innerHTML = '<div class="dhint">set the target, then press run</div>';
+      } else {
+        dOut.innerHTML = '<div class="dhint">running…</div>';
+        runTool();
+      }
+    }
+
+    function formValues() {
+      const v = {};
+      for (const el of dForm.elements) {
+        if (!el.name) continue;
+        v[el.name] = el.type === "checkbox" ? (el.checked ? 1 : 0) : el.value.trim();
+      }
+      return v;
+    }
+
+    async function runTool() {
+      const t = TOOLS[DISC.tool];
+      const body = formValues();
+      if (DISC.busy) return;
+      DISC.busy = true;
+      const btn = dForm.querySelector("button");
+      if (btn) { btn.disabled = true; }
+      let secs = 0, tick = null;
+      if (!t.live) {
+        dOut.innerHTML = '<div class="dhint">running… 0s</div>';
+        tick = setInterval(() => {
+          secs++;
+          const h = dOut.querySelector(".dhint");
+          if (h) h.textContent = `running… ${secs}s`;
+        }, 1000);
+      }
+      try {
+        let r, d;
+        if (t.get) {
+          r = await fetch(api(t.get, {}));
+        } else {
+          if (DISC.confirmed) body.confirm = 1;
+          r = await fetch(api(t.post, {}), {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(Object.assign({ token }, body)),
+          });
+          if (r.status === 428) {
+            const msg = (await r.json()).detail || "public target";
+            if (!confirm(msg + ".\n\nScanning machines you do not own may be illegal. Continue?")) {
+              dOut.innerHTML = '<div class="dhint">cancelled</div>';
+              return;
+            }
+            DISC.confirmed = true; body.confirm = 1;
+            r = await fetch(api(t.post, {}), {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(Object.assign({ token }, body)),
+            });
+          }
+        }
+        d = await r.json();
+        if (!r.ok) { dOut.innerHTML = `<div class="derr">${esc(d.detail || r.status)}</div>`; return; }
+        RENDER[DISC.tool](d);
+        if (t.live) startBw();
+      } catch (e) {
+        dOut.innerHTML = `<div class="derr">${esc(e.message || e)}</div>`;
+      } finally {
+        if (tick) clearInterval(tick);
+        DISC.busy = false;
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    dForm.onsubmit = (e) => { e.preventDefault(); stopBw(); runTool(); };
+
+    function startBw() {
+      stopBw();
+      DISC.bwTimer = setInterval(async () => {
+        if (DISC.tool !== "bw" || !PS.open) return stopBw();
+        try {
+          const d = await (await fetch(api("/api/net/bw", {}))).json();
+          RENDER.bw(d);
+        } catch (e) { /* ignore a blip */ }
+      }, 1500);
+    }
+    function stopBw() { if (DISC.bwTimer) { clearInterval(DISC.bwTimer); DISC.bwTimer = null; } }
+
+    const RENDER = {
+      self(d) {
+        DISC.lanGuess = (d.networks || []).find(n => !n.startsWith("127.")) || "";
+        let h = `<h4>HOST</h4>${table(["hostname", "primary IP", "gateway", "DNS"],
+          [[esc(d.hostname), `<span class="ok">${esc(d.primary_ip)}</span>`,
+            esc(d.gateway || "—"), esc((d.dns || []).join(", ") || "—")]])}`;
+        h += `<h4>INTERFACES</h4>` + table(["iface", "state", "MAC", "MTU", "addresses"],
+          (d.interfaces || []).map(i => [
+            esc(i.name),
+            `<span class="${i.state === "UP" ? "ok" : ""}">${esc(i.state)}</span>`,
+            esc(i.mac || "—") + (i.vendor ? ` <span class="dhint">${esc(i.vendor)}</span>` : ""),
+            esc(i.mtu ?? "—"),
+            (i.addrs || []).map(a => esc(a.ip + "/" + a.prefix)).join("<br>") || "—"]));
+        h += `<h4>ROUTES</h4>` + table(["destination", "via", "dev", "metric"],
+          (d.routes || []).map(r => [esc(r.dst), esc(r.via || "—"), esc(r.dev), esc(r.metric ?? "")]));
+        dOut.innerHTML = h;
+      },
+      public(d) {
+        if (d.error) { dOut.innerHTML = `<div class="derr">${esc(d.error)}</div>`; return; }
+        dOut.innerHTML = table(["public IP", "location", "network", "source"],
+          [[`<span class="ok">${esc(d.ip)}</span>`,
+            esc([d.city, d.region, d.country].filter(Boolean).join(", ") || "—"),
+            esc(d.org || "—"), esc(d.source || "")]]);
+      },
+      ping(d) {
+        let h = table(["target", "method", "sent", "received", "loss"],
+          [[`${esc(d.host)} <span class="dhint">${esc(d.ip)}</span>`, esc(d.method),
+            d.sent, d.received,
+            `<span class="${d.loss ? "bad" : "ok"}">${d.loss}%</span>`]]);
+        if (d.rtts && d.rtts.length) {
+          const mx = Math.max(...d.rtts);
+          h += `<h4>ROUND TRIP (ms)</h4>` + table(["min", "avg", "max", "jitter"],
+            [[d.min, `<span class="ok">${d.avg}</span>`, d.max, d.jitter]]);
+          h += d.rtts.map((v, i) =>
+            `<div>${String(i + 1).padStart(2)} <span class="dbar" style="width:${Math.max(2, v / mx * 150)}px"></span> ${v} ms</div>`).join("");
+        }
+        dOut.innerHTML = h;
+      },
+      trace(d) {
+        if (d.error) { dOut.innerHTML = `<div class="derr">${esc(d.error)}</div>`; return; }
+        dOut.innerHTML =
+          `<div class="dhint">${esc(d.host)} → ${esc(d.ip)} · ${d.complete ? "reached" : "not reached"}${d.sudo ? " · sudo" : ""}</div>` +
+          table(["#", "address", "name", "ms"], (d.hops || []).map(hp => [
+            hp.ttl,
+            hp.ip ? `<span class="ok">${esc(hp.ip)}</span>` : '<span class="dhint">*</span>',
+            esc(hp.name || ""), hp.ms ?? ""]));
+      },
+      hosts(d) {
+        dOut.innerHTML =
+          `<div class="dhint">${esc(d.network)} · ${d.scanned} addresses probed · ${d.count} up</div>` +
+          table(["IP", "name", "MAC", "vendor", "seen by"], (d.hosts || []).map(hh => [
+            `<span class="ok">${esc(hh.ip)}</span>`, esc(hh.name || ""),
+            esc(hh.mac || ""), esc(hh.vendor || ""), esc(hh.via || "")]));
+      },
+      ports(d) {
+        let h = `<div class="dhint">${esc(d.host)} (${esc(d.ip)}) · ${d.scanned} ports in ${d.seconds}s · ` +
+                `${d.open_count} open · ${d.closed} closed · ${d.filtered} filtered</div>`;
+        h += (d.open || []).length
+          ? table(["port", "service", "ms", ""], d.open.map(pp => {
+              const kind = svcKind(pp.port, pp.service);
+              return [`<span class="ok">${pp.port}</span>`, esc(pp.service || ""), pp.ms,
+                `<button class="pact" data-port="${pp.port}" data-kind="${kind}">${SVC_LABEL[kind]}</button>`];
+            }))
+          : '<div class="dhint">no open ports found</div>';
+        dOut.innerHTML = h;
+        dOut.querySelectorAll("[data-kind]").forEach(b => {
+          b.onclick = () => openSvc(d.host, Number(b.dataset.port), b.dataset.kind);
+        });
+      },
+      dns(d) {
+        dOut.innerHTML =
+          `<div class="dhint">${esc(d.name)} ${esc(d.type)} via ${esc(d.resolver)} · ${d.ms} ms${d.ttl ? " · ttl " + d.ttl : ""}</div>` +
+          ((d.answers || []).length
+            ? table(["answer"], d.answers.map(a => [`<span class="ok">${esc(a)}</span>`]))
+            : '<div class="dhint">no records</div>') +
+          (d.note ? `<div class="dhint">${esc(d.note)}</div>` : "");
+      },
+      arp(d) {
+        dOut.innerHTML = `<div class="dhint">${d.count} neighbours</div>` +
+          table(["IP", "MAC", "vendor", "dev", "state", "name"],
+            (d.neighbours || []).map(n => [
+              `<span class="ok">${esc(n.ip)}</span>`, esc(n.mac), esc(n.vendor || ""),
+              esc(n.dev), esc(n.state), esc(n.name || "")]));
+      },
+      banner(d) {
+        let h = table(["target", "TLS", "cipher"],
+          [[`${esc(d.host)}:${d.port} <span class="dhint">${esc(d.ip)}</span>`,
+            esc(d.tls_version || (d.tls ? "—" : "plain")), esc(d.cipher || "")]]);
+        if (d.error) h += `<div class="derr">${esc(d.error)}</div>`;
+        const c = d.cert;
+        if (c && !c.error) {
+          h += `<h4>CERTIFICATE</h4>` + table(["field", "value"], [
+            ["subject", esc(c.subject || "")], ["issuer", esc(c.issuer || "")],
+            ["valid from", esc(c.not_before || "")],
+            ["expires", `<span class="${c.expired ? "bad" : "ok"}">${esc(c.not_after || "")} (${c.days_left} days)</span>`],
+            ["serial", esc(c.serial || "")], ["signature", esc(c.sig || "")],
+            ["SHA-256", `<span style="word-break:break-all">${esc(c.fingerprint || "")}</span>`],
+            ["SANs", esc((c.sans || []).join(", "))]]);
+        } else if (c && c.error) { h += `<div class="derr">${esc(c.error)}</div>`; }
+        if (d.banner) h += `<h4>BANNER</h4><pre>${esc(d.banner)}</pre>`;
+        dOut.innerHTML = h;
+      },
+      http(d) {
+        let h = `<div class="dhint">${d.hops} redirect(s) · ${d.total_ms} ms total → ${esc(d.final)}</div>`;
+        h += table(["#", "status", "URL", "dns", "conn", "ttfb"],
+          (d.chain || []).map((c, i) => [
+            i + 1,
+            `<span class="${c.status && c.status < 400 ? "ok" : "bad"}">${c.status || "ERR"} ${esc(c.reason || "")}</span>`,
+            `<span style="word-break:break-all">${esc(c.url)}</span>`,
+            c.dns_ms ?? "", c.connect_ms ?? "", c.ttfb_ms ?? ""]));
+        const last = (d.chain || [])[d.chain.length - 1];
+        if (last && last.headers) {
+          h += `<h4>HEADERS</h4>` + table(["header", "value"],
+            Object.entries(last.headers).map(([k, v]) =>
+              [esc(k), `<span style="word-break:break-all">${esc(v)}</span>`]));
+        }
+        dOut.innerHTML = h;
+      },
+      bw(d) {
+        const rows = (d.interfaces || []).filter(i => i.rx + i.tx > 0);
+        const peak = Math.max(1, ...rows.map(i => Math.max(i.rx_rate, i.tx_rate)));
+        dOut.innerHTML = `<div class="dhint">live, every 1.5 s</div>` +
+          table(["iface", "↓ rate", "↑ rate", "", "total ↓", "total ↑", "err/drop"],
+            rows.map(i => [
+              esc(i.name),
+              `<span class="ok">${bytes(i.rx_rate)}/s</span>`,
+              `${bytes(i.tx_rate)}/s`,
+              `<span class="dbar" style="width:${Math.max(1, (i.rx_rate + i.tx_rate) / peak * 90)}px"></span>`,
+              bytes(i.rx), bytes(i.tx),
+              `${i.errs}/${i.drop}`]));
+      },
+      discover(d) {
+        let h = `<div class="dhint">${d.count} device(s) answered</div>`;
+        h += (d.devices || []).length
+          ? table(["proto", "IP", "name", "type", "info"], d.devices.map(x => [
+              esc(x.proto), `<span class="ok">${esc(x.ip)}</span>`, esc(x.name || ""),
+              `<span style="word-break:break-all">${esc(x.type || "")}</span>`,
+              `<span style="word-break:break-all">${esc(x.info || "")}</span>`]))
+          : '<div class="dhint">nothing answered — multicast is often blocked in containers and across VLANs</div>';
+        for (const e of d.errors || []) h += `<div class="derr">${esc(e)}</div>`;
+        dOut.innerHTML = h;
+      },
+      whois(d) {
+        if (d.error) { dOut.innerHTML = `<div class="derr">${esc(d.error)}</div>`; return; }
+        if (d.raw) { dOut.innerHTML = `<div class="dhint">${esc(d.source)}</div><pre>${esc(d.raw)}</pre>`; return; }
+        let h = table(["field", "value"], [
+          ["name", `<span class="ok">${esc(d.name || "")}</span>`],
+          ["handle", esc(d.handle || "")], ["type", esc(d.type || "")],
+          ["range", esc([d.start, d.end].filter(Boolean).join(" – ") || "—")],
+          ["country", esc(d.country || "")],
+          ["status", esc((d.status || []).join(", "))]]);
+        if ((d.events || []).length) h += `<h4>EVENTS</h4><pre>${esc(d.events.join("\n"))}</pre>`;
+        if ((d.contacts || []).length) h += `<h4>CONTACTS</h4><pre>${esc(d.contacts.join("\n"))}</pre>`;
+        if ((d.nameservers || []).length) h += `<h4>NAMESERVERS</h4><pre>${esc(d.nameservers.join("\n"))}</pre>`;
+        dOut.innerHTML = h;
+      },
+    };
+
+    const refresh = () => (PS.tab === "net" ? loadNet() : PS.tab === "disc" ? null : loadPs());
+
+    function setTab(tab) {
+      PS.tab = tab; PS.sel = null;
+      const disc = tab === "disc";
+      document.body.classList.toggle("nettab", tab === "net");
+      document.querySelectorAll(".psdrawer .tab").forEach(t =>
+        t.classList.toggle("on", t.dataset.tab === tab));
+      document.getElementById("ps-head").style.display = (tab === "ps") ? "" : "none";
+      document.getElementById("net-head").style.display = (tab === "net") ? "" : "none";
+      document.getElementById("ps-filter").style.display = disc ? "none" : "";
+      document.getElementById("ps-auto").style.display = disc ? "none" : "";
+      document.getElementById("ps-reload").style.display = disc ? "none" : "";
+      psList.style.display = disc ? "none" : "";
+      dPane.hidden = !disc;
+      document.getElementById("ps-filter").placeholder = tab === "net"
+        ? "filter by port, address, state, service or pid"
+        : "filter by name, user or pid";
+      psList.innerHTML = "";
+      if (disc) {
+        setAuto(false);
+        psStatus.textContent = "network discovery";
+        document.querySelectorAll("[data-needproc]").forEach(b => { b.disabled = true; });
+        if (!dTools.children.length) { buildTools(); pickTool("self"); }
+      } else {
+        stopBw();
+        refresh();
+      }
+    }
+
+    async function loadPs() {
+      let d;
+      try { d = await (await fetch(api("/api/ps", {}))).json(); }
+      catch (e) { psStatus.textContent = "request failed"; return; }
+      PS.rows = d.procs; PS.info = d;
+      renderPs();
+    }
+
+    function psSorted() {
+      const k = PS.sort, dir = PS.desc ? -1 : 1;
+      const f = PS.filter.trim().toLowerCase();
+      let rows = PS.rows;
+      if (f) rows = rows.filter(p =>
+        String(p.pid) === f || p.user.toLowerCase().includes(f) ||
+        p.name.toLowerCase().includes(f) || p.cmd.toLowerCase().includes(f));
+      return rows.slice().sort((a, b) => {
+        const v = (k === "cmd" || k === "user" || k === "state")
+          ? String(a[k]).localeCompare(String(b[k]))
+          : a[k] - b[k];
+        return v * dir;
+      });
+    }
+
+    function renderPs() {
+      const rows = psSorted();
+      const keep = PS.sel && PS.sel.pid;
+      const top = psList.scrollTop;
+      psList.innerHTML = "";
+      document.querySelectorAll("#ps-head span").forEach(h =>
+        h.classList.toggle("active", h.dataset.k === PS.sort));
+
+      for (const p of rows) {
+        const row = document.createElement("div");
+        row.className = "prow" + (p.user === PS.info.me ? " mine" : "") + (p.pid === keep ? " sel" : "");
+        row.innerHTML =
+          `<span class="ppid pnum">${p.pid}</span>` +
+          `<span class="puser">${p.user}</span>` +
+          `<span class="pcpu pnum${p.cpu >= 50 ? " hot" : ""}">${p.cpu.toFixed(1)}</span>` +
+          `<span class="pnum">${human(p.rss)}</span>` +
+          `<span>${p.state}</span><span class="pcmd"></span>`;
+        row.querySelector(".pcmd").textContent = p.cmd;   // textContent: command lines are untrusted
+        row.title = `${p.cmd}\nppid ${p.ppid} · ${p.threads} threads · up ${secs(PS.info.uptime - p.started)}`;
+        row.onclick = () => { PS.sel = p; renderPs(); };
+        row.ondblclick = () => signalProc("TERM");
+        psList.appendChild(row);
+      }
+      psList.scrollTop = top;
+
+      const i = PS.info;
+      const used = i.mem_total - i.mem_avail;
+      psStatus.textContent =
+        `${rows.length}${rows.length !== PS.rows.length ? "/" + PS.rows.length : ""} procs · ` +
+        `load ${i.load.map(x => x.toFixed(2)).join(" ")} (${i.ncpu} cpu) · ` +
+        `mem ${human(used)}/${human(i.mem_total)} · up ${secs(i.uptime)}` +
+        (PS.sel ? `  —  selected ${PS.sel.pid} ${PS.sel.name}` : "");
+      document.querySelectorAll("[data-needproc]").forEach(b => { b.disabled = !PS.sel; });
+    }
+
+    async function signalProc(sig) {
+      const p = PS.sel; if (!p) return;
+      if (sig === "KILL" && !confirm(`Send SIGKILL to ${p.pid} (${p.name})?\n\nThe process cannot clean up or save.`)) return;
+      try {
+        const r = await post("/api/kill", { pid: p.pid, signal: sig });
+        flash(`${sig} → ${p.pid}${r.sudo ? " (sudo)" : ""}`);
+        PS.sel = null;
+        setTimeout(refresh, 300);
+      } catch (e) { flash(String(e.message)); }
+    }
+
+    function openPs()  {
+      PS.open = true; document.body.classList.add("procs");
+      refresh(); setAuto(true);
+    }
+    function closePs() {
+      stopBw(); closeSvc();
+      PS.open = false; document.body.classList.remove("procs");
+      setAuto(false); term.focus();
+    }
+    const togglePs = () => (PS.open ? closePs() : openPs());
+    function setAuto(on) {
+      PS.auto = on;
+      document.getElementById("ps-auto").classList.toggle("on", on);
+      clearInterval(PS.timer);
+      if (on) PS.timer = setInterval(refresh, 2000);
+    }
+
+    document.getElementById("fab-ps").onclick = togglePs;
+    document.getElementById("ps-close").onclick = closePs;
+    document.getElementById("ps-reload").onclick = refresh;
+    document.getElementById("ps-auto").onclick = () => setAuto(!PS.auto);
+    document.getElementById("ps-term").onclick = () => signalProc("TERM");
+    document.getElementById("ps-kill").onclick = () => signalProc("KILL");
+    document.getElementById("ps-filter").addEventListener("input", (e) => {
+      PS.filter = e.target.value; PS.tab === "net" ? renderNet() : renderPs();
+    });
+    document.querySelectorAll(".psdrawer .tab").forEach(t => { t.onclick = () => setTab(t.dataset.tab); });
+    document.querySelectorAll("#net-head span").forEach(h => {
+      h.onclick = () => {
+        const k = h.dataset.k;
+        PS.ndesc = PS.nsort === k ? !PS.ndesc : false;
+        PS.nsort = k; renderNet();
+      };
+    });
+    document.querySelectorAll("#ps-head span").forEach(h => {
+      h.onclick = () => {
+        const k = h.dataset.k;
+        PS.desc = PS.sort === k ? !PS.desc : (k === "cpu" || k === "rss" || k === "pid");
+        PS.sort = k; renderPs();
+      };
     });
 
     /* ---------- resize / header buttons ---------- */
