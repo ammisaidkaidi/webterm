@@ -1,0 +1,47 @@
+{
+  "name": "@qcompanyofai/webterm",
+  "version": "0.1.0",
+  "description": "A minimal web-hosted terminal: run shell commands from the browser, with a file explorer, editor, process viewer and packet capture. Python backend, no build step.",
+  "keywords": [
+    "terminal",
+    "shell",
+    "pty",
+    "web-terminal",
+    "xterm",
+    "sysadmin"
+  ],
+  "homepage": "https://github.com/ammisaidkaidi/webterm#readme",
+  "bugs": {
+    "url": "https://github.com/ammisaidkaidi/webterm/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ammisaidkaidi/webterm.git"
+  },
+  "license": "MIT",
+  "author": "ammisaidkaidi",
+  "type": "commonjs",
+  "bin": {
+    "webterm": "bin/webterm.js"
+  },
+  "files": [
+    "bin/webterm.js",
+    "server.py",
+    "netscan.py",
+    "sniffer.py",
+    "requirements.txt",
+    "static/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "os": [
+    "linux",
+    "darwin"
+  ],
+  "scripts": {
+    "start": "node bin/webterm.js"
+  }
+}
