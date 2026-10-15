@@ -372,8 +372,8 @@ Actions workflow lives at `dev/github-workflow.yml`; copy it to
 `.github/workflows/check.yml` to switch CI on (pushing that path needs a token
 with the `workflow` scope).
 
-Beyond syntax and `ruff`, it guards two Beyond syntax and `ruff`, it guards
-mistakes this codebase has actually made:
+Beyond syntax and `ruff`, it guards three mistakes this codebase has actually
+made:
 
 - **The inline `<script>`.** The whole UI is one `<script>` block in
   `static/index.html`, so nothing else ever parses it; the script extracts it
